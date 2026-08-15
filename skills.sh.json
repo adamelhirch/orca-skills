@@ -1,0 +1,15 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "groupings": [
+    {
+      "title": "Orca orchestration",
+      "description": "Skills for orchestrating multi-agent work on Orca: coordinator runbook, durable project handoff/resume, and the supervised worker agents.",
+      "skills": [
+        "orca-orchestrate",
+        "orca-handoff",
+        "orca-resume",
+        "orca-worker"
+      ]
+    }
+  ]
+}
