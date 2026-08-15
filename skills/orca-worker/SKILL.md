@@ -48,6 +48,6 @@ and disciplined to report `worker_done` exactly once.
 
 ## Troubleshooting
 
-- If `~/.claude/agents/` is not writable (e.g. root-owned, mode `700`), fix its ownership once
-  with `sudo chown -R "$(whoami):$(id -gn)" ~/.claude/agents` before retrying. The opencode
-  agent is unaffected — it lives in `~/.config/opencode/agents/`.
+- If the Claude Code copy fails because `~/.claude/agents/` is not writable (e.g. owned by
+  another account), make that directory user-owned first, then retry. The opencode agent is
+  unaffected — it lives in `~/.config/opencode/agents/`.
