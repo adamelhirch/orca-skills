@@ -38,6 +38,15 @@ npx skills add adamelhirch/orca-skills
 All skills are user-invoked (`disable-model-invocation: true`) so they only fire when an
 orchestrator calls them by name — never automatically in a worker session.
 
+## Security note
+
+The worker agents installed by `/orca-worker` are **permissive by design**: they run
+unattended, so `external_directory`/`doom_loop` are allowed (opencode), `--auto` and
+`permissionMode: bypassPermissions` (Claude Code) skip approval prompts. Skills audits
+(Gen/Socket/Snyk) therefore flag `orca-worker` — that is the intended posture for an
+unattended orchestration worker, not a defect. Scope it accordingly: worker terminals run
+only dispatches the orchestrator injects, in ephemeral worktrees.
+
 ## Notes
 
 - `npx skills add` installs copies; re-run it to pick up repo updates.
