@@ -55,8 +55,14 @@ memory.
 5. Issue mirror (required by the tracker choice — there is no markdown tracker): read the
    tracker from `docs/agents/setup.md` (the `## Issue tracker` section). Create one issue per
    task with the plan id in the title and blocking links mirroring the edges:
-   - **github** → `gh issue create --title "<plan id>: <title>" --body "<spec>"` (linked issues
-     via `--depends-on` where supported). Note: `gh issue create` has **no `--json` flag** — it
+   - **github** → `gh issue create --title "<plan id>: <title>" --body "<spec>"`. Dependency
+     edges are carried by the **Orca DAG (`--deps`) as the single source of truth**; the issue
+     mirror documents them in the body — after all issues exist, append `Blocked by: #<num>` /
+     `Blocks: #<num>` lines using the captured issue numbers. Optionally add real blocking links
+     via `--depends-on` **only when the installed `gh` supports it** — runtime-detect support;
+     do not assume it (on this project's toolchain `gh issue create` has no `--depends-on` flag
+     and the REST dependencies endpoint 404s, so the body documentation + Orca DAG is the
+     fallback that must always work). Note: `gh issue create` has **no `--json` flag** — it
      prints the new issue URL to stdout; capture the issue number from that URL. Then link the
      task worktree:
      `orca worktree set --worktree <task_worktree_selector> --issue <num> --json`.
