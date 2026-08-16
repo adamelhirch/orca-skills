@@ -6,8 +6,8 @@
   "visualReview": "pending",
   "artifact": {
     "path": "/Users/adamelhirch/orca/workspaces/AdamHUB/orca-skills/docs/diagrams/orca-pipeline.html",
-    "sha256": "ee768a2c673c6e25fee72aff21a399a6fd24020d393e3c69de4e2bd55aadf9ed",
-    "bytes": 635211
+    "sha256": "ba3f36ecff6b6fcb087a4a417bd303b02bcf1c43be239ef0ce0938907720b369",
+    "bytes": 635114
   },
   "state": {
     "detail": "read",

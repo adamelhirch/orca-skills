@@ -24,8 +24,12 @@ npx skills add adamelhirch/orca-skills
 ```
 
 An interactive diagram of the pipeline (open in a browser) lives at
-[`docs/diagrams/orca-pipeline.html`](docs/diagrams/orca-pipeline.html) — the main path, the
-tracker mirror, and the failure gate.
+[`docs/diagrams/orca-pipeline.html`](docs/diagrams/orca-pipeline.html), with a PNG export
+([`docs/diagrams/orca-pipeline.png`](docs/diagrams/orca-pipeline.png)):
+
+![Orca orchestration pipeline](docs/diagrams/orca-pipeline.png)
+
+The diagram shows the main path, the per-tracker mirror, and the failure gate.
 
 ## Skills
 
