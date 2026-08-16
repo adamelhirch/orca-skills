@@ -1,0 +1,111 @@
+---
+name: orca-plan
+description: >-
+  Brainstorm an Orca run with the user before any worker runs: grill the objective
+  until the agent and the user share a mental model, then write docs/agents/plan.md
+  and get explicit approval before tasks are cut. Orchestrator sessions only.
+  Invoke with /orca-plan.
+disable-model-invocation: true
+argument-hint: "What are we planning?"
+---
+
+# Plan an Orca run
+
+Turn an objective into a shared, approved plan before any task is cut. This is the brainstorm
+step of the pipeline (`/orca-setup` → `/orca-plan` → `/orca-tasks` → `/orca-orchestrate`). The
+orchestrator interrogates the objective relentlessly until the agent and the user are on the
+same page, then writes a durable plan document the next skills consume.
+
+## Gate
+
+Check the setup marker first: if `docs/agents/setup.md` does not exist, route the user to
+`/orca-setup` before planning (the conventions — CI-green, one-task-one-branch, TDD — come
+from setup).
+
+## The interview
+
+Work the objective as a **design tree** in **rounds**. Every decision branches into the
+decisions that hang off it; the **frontier** is every decision whose prerequisites are already
+settled — the questions you can ask *now* without guessing at answers you haven't heard yet.
+Ask the whole frontier in one round; then wait for the user's answers before the next round.
+
+Per-question format:
+
+```
+❓ **Q<n>** - **<question title>**: <question body, might be multiple paragraphs, options>
+
+➡️ <your recommended answer>
+```
+
+Each round the user's answers reshape the tree — settled decisions push the frontier outward and
+unblock questions that depended on them. Recompute the frontier and ask the next round. A
+question whose answer depends on another question still open in this round belongs to a *later*
+round, not this one.
+
+Finding *facts* is your job, never the user's. When a frontier question needs a fact from the
+environment (filesystem, issues, tracker, git history), dispatch a sub-agent to find it — don't
+ask the user for anything you could look up yourself. Don't block on it: a running exploration
+is an unsettled prerequisite, so only the questions downstream of it wait for the sub-agent to
+report — ask the rest of the frontier now. The *decisions* are the user's — put each to them and
+wait.
+
+Interview until the frontier is empty: every branch of the design tree visited, nothing left
+silently assumed. Do not write the plan before the user confirms the shared understanding.
+
+### Cover at minimum
+
+- **Goal and scope** — what done looks like, what is explicitly out of scope.
+- **Task decomposition** — the natural slices and their dependency edges. Keep chains shallower
+  than 3-4 steps (each task sized to one fresh worker context window).
+- **Test seams** — the pre-agreed seams each task tests at, and whether TDD applies (default:
+  yes). Seams must be settled *now* because the worker cannot ask mid-run.
+- **Isolation** — which tasks run in their own worktree/branch (default: all) vs. explicitly
+  non-isolated (integration pass, validate current branch). Tasks never run on the primary
+  worktree unless marked.
+- **Agent + model** — which agent runs which task (default: the `worker` agent, opencode
+  unless the run says otherwise), and any model/effort choices.
+- **Merge policy** — the tracker in `docs/agents/setup.md` decides the merge path: **github**
+  → CI-green gate + squash-merge the PR; **linear** (local-only) → the worker's tests are the
+  gate, merge the branch into `main` locally. Confirm the gate with the user in the interview.
+
+## Write the plan
+
+Write `docs/agents/plan.md` (rolling, overwrite) with this schema:
+
+```
+# Plan — <repo> — <date>
+
+## Objective       (one or two lines: what done looks like)
+## Context         (why now, constraints, references by path — CONTEXT.md, docs/adr/, issues)
+## Decisions       (what was settled, one line each)
+## Out of scope    (explicitly excluded, so workers don't drift)
+
+## Tasks
+<!-- one block per task, keyed by stable id -->
+### <id>: <title>
+- spec: <one-paragraph worker brief, including the test seam and TDD expectations>
+- blocked-by: <ids or none>
+- agent: <default worker>
+- isolated: <yes|no — no means it runs in the primary worktree>
+
+## Status
+draft → approved (date) — set to approved only after the user approves in conversation
+```
+
+Each task id is stable (`t1`, `t2`, ...) so `/orca-tasks` can reference it and
+`/orca-orchestrate` can reconcile. Do not duplicate CONTEXT.md or ADR bodies — reference them by
+path.
+
+## Approval checkpoint
+
+End by presenting the plan summary in conversation and asking for approval. Only on an explicit
+"approved" do you set `Status: approved` + date in the plan doc. `/orca-tasks` refuses to run on
+a plan that is not approved. Approval is a doc state, not an Orca gate — it survives
+`/orca-resume`.
+
+## Done when
+
+- The frontier is empty: no decision left silently assumed.
+- `docs/agents/plan.md` exists, approved, with stable task ids, dependency edges, test seams,
+  isolation flags, and agent choices.
+- The user has confirmed the shared understanding in conversation.

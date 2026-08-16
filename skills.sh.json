@@ -3,12 +3,14 @@
   "groupings": [
     {
       "title": "Orca orchestration",
-      "description": "Skills for orchestrating multi-agent work on Orca: coordinator runbook, durable project handoff/resume, and the supervised worker agents.",
+      "description": "Skills for orchestrating multi-agent work on Orca: project setup, plan-first brainstorm, plan-to-task cutting, the coordinator DAG runbook, durable project handoff/resume, and the supervised worker + orchestrator agents.",
       "skills": [
+        "orca-setup",
+        "orca-plan",
+        "orca-tasks",
         "orca-orchestrate",
         "orca-handoff",
-        "orca-resume",
-        "orca-worker"
+        "orca-resume"
       ]
     }
   ]

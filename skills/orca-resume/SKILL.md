@@ -13,6 +13,12 @@ argument-hint: "What are we picking up?"
 Re-anchor into an Orca project from a fresh orchestrator session. Reconstruct context from the
 handoff document plus live Orca state — never from memory about what was supposed to happen.
 
+## Entry gate
+
+Before anything else, check the setup marker: if `docs/agents/setup.md` does not exist, route to
+`/orca-setup` first (a project that was never hooked up cannot resume a pipeline). A user can
+skip setup explicitly — respect the marker's recorded choice.
+
 ## Load the guides before any command
 
 ```text
@@ -23,7 +29,9 @@ orca skills get orchestration
 ## Steps
 
 1. Find the handoff first: `docs/agents/handoff.md` (rolling) and the most recent snapshot in
-   `docs/agents/handoffs/`. Load it as the working context.
+   `docs/agents/handoffs/`. Load it as the working context. If present, also load
+   `docs/agents/plan.md` (the current plan, approved or draft) and `docs/agents/setup.md` (the
+   conventions in force) — they are part of the durable pipeline state.
 2. Reconcile it against live Orca state:
    - `orca worktree current --json` / `orca worktree show --worktree current --json`
      (worktree, branch, HEAD, card comment)
@@ -47,5 +55,6 @@ so — the context is thinner and everything above comes from the reads alone.
 
 - The summary names the project, the current worktree/branch, and its last status — all from
   verified reads, not inference.
-- Every drift between the handoff document and live state is called out.
+- Every drift between the handoff document and live state is called out, including the state of
+  `docs/agents/plan.md` (approved/draft) and `docs/agents/setup.md`.
 - The next steps and ownership are unambiguous, and the card comment reflects the resume.
