@@ -23,6 +23,10 @@ npx skills add adamelhirch/orca-skills
                     └─────────────────────── /orca-resume in the next session
 ```
 
+An interactive diagram of the pipeline (open in a browser) lives at
+[`docs/diagrams/orca-pipeline.html`](docs/diagrams/orca-pipeline.html) — the main path, the
+tracker mirror, and the failure gate.
+
 ## Skills
 
 | Skill | Purpose |
