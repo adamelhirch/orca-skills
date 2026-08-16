@@ -50,6 +50,11 @@ in progress on this repo.
 
 ## In progress / next
 
+- **2026-08-16 (post-handoff)** — `orca-tasks` patched: codified the `--depends-on` fallback
+  (Orca DAG `--deps` = single source of truth; issue body documents `Blocked by/Blocks`; the
+  flag is runtime-detected — `gh` 2.83.1 lacks it and the REST dependencies endpoint 404s).
+  Merged via PR #1 (`016d4cf`), branch deleted, plan at `docs/agents/plan.md` (approved, lean
+  path, `isolated: no`). Working tree clean.
 - Optional cleanup of throwaway validation artifacts: repos `adamelhirch/test` and
   `adamelhirch/test-github` (and their local clones under `~/orca/projects/`), Linear issues in
   the `testing-orca` workspace, and the two idle orchestrator terminals on this host.
