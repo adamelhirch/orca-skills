@@ -41,6 +41,7 @@ The diagram shows the main path, the per-tracker mirror, and the failure gate.
 | `/orca-orchestrate` | Coordinator runbook: bind the Run, sweep `task-list --ready`, dispatch one-task-one-branch to `worker` terminals, watchdog `check --wait`, gate failures, merge green task branches, release workers. Quick path for 1-2 task runs. |
 | `/orca-handoff` | Write a durable project handoff (Orca state + plan + session context) so a fresh orchestrator session resumes without losing context. |
 | `/orca-resume` | Resume an Orca project: setup gate, load handoff + plan, reconcile with live Orca state, flag drift, re-anchor. |
+| `/orca-freebuff` | Dispatch tasks to free (ad-funded) Freebuff coding agents as terminal-driven TUI workers — no headless mode exists, so the orchestrator injects the prompt, polls for a completion marker, and impersonates `worker_done` from the cockpit. |
 
 ## Prerequisites
 
