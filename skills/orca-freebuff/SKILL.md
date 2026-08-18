@@ -70,7 +70,9 @@ orca worktree create --name <slug> --no-parent --json
 orca terminal create --worktree id:<newWorktreeId> --title <slug> --command "freebuff" --json
 orca terminal wait --terminal <handle> --for tui-idle --timeout-ms 90000 --json
 # the welcome screen ("Freebuff will run commands on your behalf") is non-blocking:
-# the first message sent is accepted as a prompt. Optionally read to confirm the model banner.
+# the first message sent is accepted as a prompt. The welcome screen sometimes includes a
+# model picker — an Enter confirms the pre-selected model (typically DeepSeek V4 Flash,
+# "UNLIMITED"); read the screen once to confirm the banner before sending the prompt.
 
 # 2. bind the dispatch WITHOUT --inject (creates the dispatch, assigns the terminal)
 orca orchestration dispatch --task <task_id> --run <run_id> --to <handle> --json
@@ -138,16 +140,20 @@ orca orchestration send --type worker_done --subject succeeded --outcome succeed
 ```
 
 The lifecycle marks the task completed automatically (`action: completed`, provenance
-`reportedBy: <worker_handle>`). Do **not** follow with `task-update --status completed`.
+`reportedBy: <worker_handle>`). Do **not** follow with `task-update --status completed`. The
+worker_done also **auto-settles the dispatch**: a later `worker-release --dispatch ...` returns
+`dispatch_not_found` — that is the expected outcome of this pattern, skip the release step.
 
 Then merge green work as the coordinator always does (github: `gh pr merge --squash
 --delete-branch` after CI; local/linear: squash-merge into the cockpit main), then:
 
 ```bash
-orca orchestration worker-release --dispatch <dispatch_id> --json
 orca worktree rm --worktree <task_worktree_id> --force --json
 orca terminal close --terminal <handle> --json    # freebuff terminals are external; close them
 ```
+
+(`worker-release` is intentionally omitted: the impersonated worker_done already settled the
+dispatch — see "Settle the dispatch".)
 
 ## Failures
 
