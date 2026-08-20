@@ -136,7 +136,23 @@ if (!existsSync(join(ROOT, installer))) {
   fail(installer, "agent composer is not executable");
 }
 
-// --- 5. relative links resolve ----------------------------------------------------------------
+// --- 5. skills are self-contained --------------------------------------------------------------
+// `skills add` installs each skill directory standalone: everything inside skills/<name>/ travels,
+// nothing outside it does. A SKILL.md linking to ../../docs/whatever.md resolves in this repo and
+// 404s for every installed user — the worst kind of defect, invisible where it is authored.
+for (const skill of skills) {
+  const path = `skills/${skill}/SKILL.md`;
+  if (!existsSync(join(ROOT, path))) continue;
+  for (const [, target] of read(path).matchAll(/\]\(([^)\s]+)\)/g)) {
+    if (/^(https?:|mailto:|#)/.test(target)) continue;
+    const resolved = resolve(ROOT, `skills/${skill}`, target.split("#")[0]);
+    if (!resolved.startsWith(join(ROOT, "skills", skill))) {
+      fail(path, `links outside its own skill directory (${target}) — installed skills are standalone, so it will not resolve for users`);
+    }
+  }
+}
+
+// --- 6. relative links resolve ----------------------------------------------------------------
 function markdownFiles(dir) {
   const found = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {

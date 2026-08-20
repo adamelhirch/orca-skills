@@ -62,8 +62,12 @@ silently assumed. Do not write the plan before the user confirms the shared unde
 - **Isolation** — which tasks run in their own worktree/branch (default: all) vs. explicitly
   non-isolated (integration pass, validate current branch). Tasks never run on the primary
   worktree unless marked.
-- **Agent + model** — which agent runs which task (default: the `worker` agent, opencode
-  unless the run says otherwise), and any model/effort choices.
+- **Worker runtime + model** — which runtime executes each task. The default comes from
+  `docs/agents/setup.md` (`## Worker runtime`: `opencode`, `claude-code`, or `freebuff`) and is
+  independent of the agent the orchestrator itself runs in. Override it per task when the mix
+  is worth it — cheap mechanical work to `freebuff`, design-sensitive work to a paid runtime —
+  and remember a `freebuff` task needs the coordinator present to poll and sign it, so it must
+  not sit on the critical path of an unattended stretch. Settle model/effort choices here too.
 - **Merge policy** — `docs/agents/setup.md` already records the **merge gate** (`github-actions`,
   `local <command>`, or `unverified`) and the **tracker**, which decides the merge path: **github**
   → squash-merge the PR; **linear** (local-only) → merge the branch into `main` locally. Read the
@@ -90,7 +94,7 @@ Write `docs/agents/plan.md` (rolling, overwrite) with this schema:
 ### <id>: <title>
 - spec: <one-paragraph worker brief, including the test seam and TDD expectations>
 - blocked-by: <ids or none>
-- agent: <default worker>
+- runtime: <opencode|claude-code|freebuff — default: the setup marker's worker runtime>
 - isolated: <yes|no — no means it runs in the primary worktree>
 - budget: <minutes before a non-settling worker escalates to a user gate; default 60>
 
@@ -113,6 +117,6 @@ a plan that is not approved. Approval is a doc state, not an Orca gate — it su
 
 - The frontier is empty: no decision left silently assumed.
 - `docs/agents/plan.md` exists, approved, with stable task ids, dependency edges, test seams,
-  isolation flags, agent choices, and a time budget per task.
+  isolation flags, a worker runtime, and a time budget per task.
 - The merge gate recorded at setup was read back to the user and confirmed for this run.
 - The user has confirmed the shared understanding in conversation.
