@@ -3,10 +3,11 @@ name: orca-setup
 description: >-
   Hook a project up to Orca supervised orchestration: register the repo (creating
   or linking a GitHub repo when none exists, asking public/private), install the
-  worker + orchestrator agent pairs (opencode and Claude Code), and record the
-  per-repo conventions (CI-green, one-task-one-branch, primary worktree) plus the
-  issue tracker (github via gh, or linear via orca linear — always resolving the
-  workspace). Two flows: a brand-new empty project and an existing repo.
+  worker + orchestrator agent pairs (opencode and Claude Code), resolve the merge
+  gate that defines what "verified" means here (github-actions, a local test
+  command, or an explicitly accepted unverified project), and record the per-repo
+  conventions plus the issue tracker (github via gh, or linear via orca linear —
+  always resolving the workspace). Two flows: a new empty project and an existing repo.
   Orchestrator sessions only. Invoke with /orca-setup.
 disable-model-invocation: true
 argument-hint: "New project or existing repo?"
@@ -72,14 +73,23 @@ Pick the flow by the state of the target directory:
    `isMainWorktree` is `true`. If none is tagged, ask the user which worktree is primary.
    The primary worktree is the cockpit: it stays on the default branch, receives merged PRs,
    and is where the orchestrator coordinates from. Tasks never run in it.
-5. Install the agent pairs for this host (opencode + Claude Code):
-   - opencode: copy `agents/opencode/worker.md` to `~/.config/opencode/agents/worker.md`
-     and `agents/opencode/orchestrator.md` to `~/.config/opencode/agents/orchestrator.md`
-     (create the `agents` directory if missing).
-   - Claude Code: copy `agents/claude/worker.md` to `~/.claude/agents/worker.md` and
-     `agents/claude/orchestrator.md` to `~/.claude/agents/orchestrator.md`.
-   - If a target `agents` directory did not exist when the agent session started, restart that
-     agent once so the definitions are picked up.
+5. Install the agent pairs for this host (opencode + Claude Code) with the composer:
+   ```bash
+   <skill-dir>/install-agents.sh --dry-run   # show the four destinations
+   <skill-dir>/install-agents.sh             # compose and install
+   ```
+   Each installed agent is a **host header** (`agents/{opencode,claude}/<role>.md`: frontmatter +
+   host-specific permission notes) concatenated with the **shared behaviour contract**
+   (`agents/_shared/<role>-contract.md`). The contract exists once per role, so a rule fixed once
+   is fixed on every host. Never edit an installed agent in place and never copy the host headers
+   by hand — a header without its contract is a worker with no lifecycle, TDD, or merge-gate
+   rules at all.
+
+   The script exits non-zero and names the destination if any of the four cannot be written
+   (the known case is a `~/.claude/agents/` owned by another account). A half-installed pair
+   stalls a run on the host that is missing it, so **setup is not complete until it exits 0.**
+   If a target `agents` directory did not exist when the agent session started, restart that
+   agent once so the definitions are picked up.
 6. Verify the official guides are present (the skills load their command surface from the
    Orca binary, never from this repo): `orca skills get orchestration` and
    `orca skills get orca-cli` must both return the guides. If either fails, run
@@ -104,20 +114,45 @@ Pick the flow by the state of the target directory:
    **The two trackers are exclusive.** One project mirrors to exactly one tracker — `github` or
    `linear`, never both. With `github`, only `gh` issues are created; with `linear`, only Linear
    issues. An empty GitHub issue list on a linear-tracker project is expected, not a bug.
-8. Write the setup marker `docs/agents/setup.md` (create the `docs/agents` directory if
+8. **Determine and record the merge gate.** "CI green" is meaningless until you know what runs
+   here — and it degrades silently: `gh pr checks` prints `no checks reported` and **exits 0** on
+   a repo with no workflows, so a worker that trusts the exit code reports success having run
+   nothing. Resolve the gate now, at setup, where a human is present. Probe, then confirm with
+   the user:
+   ```bash
+   gh api repos/:owner/:repo/actions/workflows --jq '.total_count'   # 0 = no GitHub Actions
+   ls .github/workflows 2>/dev/null
+   ```
+   Record exactly one mode:
+   - **`ci: github-actions`** — the probe found at least one workflow. `gh pr checks` is
+     authoritative, **and an empty check set is a failure, not a pass**. Only valid with a
+     GitHub remote.
+   - **`ci: local <command>`** — no CI, but the repo has a test command. Ask the user for the
+     exact command (`uv run pytest`, `npm test`, `cargo test`, …), **run it once yourself** to
+     confirm it exists and exits 0 on a clean tree, and record it verbatim. This is the normal
+     mode for a local-only or linear-tracked project.
+   - **`ci: unverified`** — no CI and no test command. Do **not** choose this for the user:
+     state plainly that every task will merge with nothing verifying it, and record it only on
+     an explicit acceptance, with the reason.
+
+   A repo with tests but no recorded gate is the failure this step exists to prevent. If the
+   probe finds workflows *and* the user names a local command, prefer `github-actions` and note
+   the local command alongside it.
+9. Write the setup marker `docs/agents/setup.md` (create the `docs/agents` directory if
    missing). It records everything the rest of the pipeline relies on:
    ```
    # Orca setup — <repo> — <date>
 
    ## Primary worktree   (selector / display name of the cockpit worktree)
    ## Repo               (remote or "local-only")
-   ## Conventions        (CI-green merge gate, one-task-one-branch, TDD by default)
+   ## Merge gate         (ci: github-actions | ci: local <command> | ci: unverified — verbatim)
+   ## Conventions        (one-task-one-branch, TDD by default)
    ## Issue tracker      (github | linear — with workspace id + team key for linear)
    ## Agents installed   (worker + orchestrator for opencode and Claude Code)
    ## Guides             (orca orchestration + orca-cli present in the binary)
    ## Status             (setup complete | skipped — <reason>)
    ```
-9. Point the primary worktree card at it:
+10. Point the primary worktree card at it:
    `orca worktree set --worktree <primary-selector> --comment "setup → docs/agents/setup.md"`.
 
 ## What appears in Orca's Tasks tab
@@ -133,7 +168,12 @@ task appears in the Tasks tab under the chosen tracker.
 
 - The repo is registered in Orca; the primary worktree is identified; a GitHub remote exists
   or "local-only" was explicitly recorded.
-- Both agent pairs (`worker` + `orchestrator`) are installed for opencode and Claude Code.
+- Both agent pairs (`worker` + `orchestrator`) are installed for opencode and Claude Code —
+  `install-agents.sh` exited 0, so all four destinations are composed, not just some.
+- The **merge gate** is recorded verbatim in `docs/agents/setup.md`: `github-actions` (workflows
+  confirmed present), `local <command>` (command run once and confirmed), or `unverified`
+  (explicitly accepted by the user, with the reason). A project whose gate is unrecorded cannot
+  be orchestrated — the worker has no definition of "verified".
 - The official guides (`orca orchestration`, `orca-cli`) are confirmed present in the binary.
 - The tracker is recorded in `docs/agents/setup.md`: **github** with a confirmed remote, or
   **linear** with a concrete `workspace` id + `team` key chosen by the user from

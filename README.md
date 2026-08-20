@@ -53,8 +53,12 @@ The diagram shows the main path, the per-tracker mirror, and the failure gate.
   ```
 - For Linear tracking, a Linear workspace connected in Orca settings + the native `orca linear`
   CLI. For GitHub tracking, an authenticated `gh` CLI and a remote.
-- `/orca-setup` installs the agent pairs: opencode `~/.config/opencode/agents/worker.md` +
-  `orchestrator.md` and Claude Code `~/.claude/agents/worker.md` + `orchestrator.md`.
+- `/orca-setup` installs the agent pairs via `skills/orca-setup/install-agents.sh`: opencode
+  `~/.config/opencode/agents/{worker,orchestrator}.md` and Claude Code
+  `~/.claude/agents/{worker,orchestrator}.md`. Each is composed from a host header
+  (`agents/<host>/<role>.md`, frontmatter + host permissions) plus the shared behaviour contract
+  (`agents/_shared/<role>-contract.md`) — the lifecycle, TDD, and merge-gate rules exist once per
+  role, not once per host.
 
 ## Usage
 
@@ -81,12 +85,19 @@ calls them by name — never automatically in a worker session.
 - **TDD by default.** Workers write the failing test first at the plan's agreed seams, then the
   minimal implementation — one vertical slice at a time. No `worker_done succeeded` without
   green tests.
-- **CI/tests are the merge gate.** Workers open PRs as drafts and only mark them ready when
-  tests are green; the coordinator merges green work (squash PR for GitHub, local merge for a
-  linear project with no remote). Nothing red merges — better to test and fix than to merge and
-  break everything.
-- **Failures gate to the user.** A failed task is marked failed, its dependents blocked, and a
-  decision gate is raised (bounded retry recommended) — no silent redispatch.
+- **The merge gate is a capability, resolved at setup.** `/orca-setup` records one of
+  `ci: github-actions`, `ci: local <command>`, or `ci: unverified` in `docs/agents/setup.md`, and
+  that is what "verified" means for the project. This matters because the gate degrades silently
+  otherwise: `gh pr checks` prints `no checks reported` and **exits 0** on a repo with no
+  workflows, so a worker trusting the exit code reports success having run nothing. An empty
+  check set is a failed gate, never a pass. The coordinator merges only work whose report names
+  its evidence; the worker never merges.
+- **Failures and stuck workers gate to the user.** A failed task is marked failed, its dependents
+  blocked, and a decision gate is raised (bounded retry recommended) — no silent redispatch. A
+  worker past its plan `budget:` climbs a bounded escalation ladder (watchdog → gate →
+  user-approved `worker-stop`/`worker-abandon`); a timeout alone never kills anything. Every
+  gate the coordinator opens it also closes: the DAG loop sweeps `gate-list --status pending`
+  and `gate-resolve`s before dispatching more work.
 
 ## Issue tracking: two exclusive trackers
 

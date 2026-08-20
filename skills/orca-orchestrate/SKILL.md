@@ -3,9 +3,10 @@ name: orca-orchestrate
 description: >-
   Orca orchestration coordinator runbook for orchestrator sessions only: bind the
   Run created by /orca-tasks, dispatch ready tasks one-worktree-one-branch, drive
-  the task DAG, watchdog check --wait, gate failures, auto-merge green PRs, release
-  workers. Also has a quick path for 1-2 task runs without a plan. Invoke with
-  /orca-orchestrate.
+  the task DAG, sweep and resolve pending decision gates, watchdog check --wait with
+  a bounded escalation ladder, merge work that satisfied the setup marker's merge
+  gate, and release workers without leaking terminals. Also has a quick path for 1-2
+  task runs without a plan. Invoke with /orca-orchestrate.
 disable-model-invocation: true
 argument-hint: "Objective of the run?"
 ---
@@ -44,7 +45,10 @@ subcommands or flags from memory.
 1. Verify the primary worktree: `orca worktree current --json` → `isMainWorktree` must be
    `true`, or the run is being coordinated from a task branch. Stop and move to the cockpit
    worktree if not.
-2. Verify the setup marker exists (`docs/agents/setup.md`), else route to `/orca-setup`.
+2. Verify the setup marker exists (`docs/agents/setup.md`), else route to `/orca-setup`. Read
+   its `## Merge gate` section now and keep it in mind for the whole run — it is what every
+   `succeeded` report will be checked against. A marker with no merge gate predates this
+   contract: re-run `/orca-setup` rather than inventing one mid-run.
 3. Bind the Run (planned path):
    ```bash
    orca orchestration run-use --id <run_id> --json
@@ -53,10 +57,23 @@ subcommands or flags from memory.
 
 ## The DAG loop
 
-1. **Sweep** what is ready to run:
+Each turn of the loop is **sweep ready → sweep gates → dispatch → wait → settle**. The gate sweep
+is not optional: a gate you opened blocks a task until you resolve it, so a loop that only ever
+creates gates deadlocks the DAG by construction.
+
+1. **Sweep** — first what is waiting on you, then what is ready to run:
    ```bash
+   orca orchestration gate-list --run <run_id> --status pending --json
    orca orchestration task-list --run <run_id> --ready --json
    ```
+   **Resolve every pending gate before dispatching more work.** Put the question to the user,
+   then close it with their decision:
+   ```bash
+   orca orchestration gate-resolve --id <gate_id> --resolution "<the user's decision>" --json
+   ```
+   Never leave a gate pending across a wait window. An unresolved gate and a stuck worker look
+   identical from the outside, and only one of them is your own doing.
+
    Every `ready` task has all its blockers merged on `main`. Dispatch each ready task to a
    worker in its own worktree — **one task = one branch = one worktree**, never the primary.
 
@@ -90,9 +107,15 @@ subcommands or flags from memory.
    A timeout or `{count:0}` is a checkpoint, not a worker failure. Keep waiting until every
    dispatch settles; workers routinely run 15-60 minutes.
 3. **On each `worker_done`**, settle it before acknowledging the Delivery:
-   - `succeeded` → the worker already verified the tests are green (CI for github, `uv run
-     pytest`/equivalent for local). **Merge** the task branch, then clean up the task worktree,
-     then re-sweep:
+   - `succeeded` → **check how it was verified before you merge.** Read `## Merge gate` in
+     `docs/agents/setup.md` and confirm the report matches it: under `ci: github-actions` the PR
+     must show at least one check and all green (`gh pr checks <pr>` — `no checks reported` is a
+     failed gate, not a pass); under `ci: local <command>` the `worker_done` body must quote that
+     command's result; under `ci: unverified` there is nothing to check and the merge is the
+     user's accepted risk. A `succeeded` that does not name its evidence is not a pass — ask the
+     worker (`orca orchestration reply`) or gate it, do not merge on trust.
+     Once the gate holds, **merge** the task branch, then clean up the task worktree, then
+     re-sweep:
       ```bash
       # github tracker: merge the PR (auto or via the user's review gate)
       gh pr merge <pr_number> --squash --delete-branch
@@ -144,12 +167,50 @@ Never stop, close, or kill a worker because of a timeout, TUI idle, heartbeat, o
 mean alive, not done. Never leave a settled worker live: reuse, retain only at the user's
 request, or `worker-release`.
 
+## Escalation ladder for a worker that will not settle
+
+"Never kill on a timeout" is right, but it is not a plan — without a ceiling a stuck dispatch
+waits forever and the run looks healthy. Give each task a **time budget** (the plan's `budget:`
+field, default 60 min) and climb one rung at a time:
+
+1. **Under budget** — keep waiting. Rolling `check --wait` windows; a timeout is a checkpoint.
+2. **Budget exceeded** — run the watchdog above (`worker-read` + `terminal wait --for tui-idle`).
+   If the work is visibly done, re-inject the finalization from the worker's own terminal.
+3. **Still unsettled after the watchdog** — this is now a decision for the user, not a judgement
+   call for you. Raise a gate with the evidence (last output, elapsed time, branch state):
+   ```bash
+   orca orchestration gate-create --task <task_id> --question "<task> has run <elapsed> past its <budget> budget and will not settle; last output shows <summary>. Wait longer, stop the worker, or abandon the dispatch?" --options '["wait","stop","abandon"]' --json
+   ```
+4. **Only on the user's decision** — `orca orchestration worker-stop --dispatch <id>` (fences the
+   dispatch and stops its terminal) or `worker-abandon` (fences without claiming the process
+   stopped, for a worker you cannot reach). Then `gate-resolve` with what was chosen. Neither
+   command is ever yours to run unprompted.
+
+## Leaked terminals
+
+A settled task can still own a live terminal — terminal accounting is tracked separately from
+task status, and the `external_terminal` workers this runbook launches are exactly the ones Orca
+will not reclaim on its own. Sweep for them at the end of every run, and any time the host feels
+loaded:
+
+```bash
+orca orchestration worker-list --run <run_id> --json
+orca orchestration worker-list --terminal-state reclaimable --json
+```
+
+Anything `reclaimable` is a worker that finished and was never released: `worker-release` it, then
+`orca terminal close --terminal <handle>` for the external ones. A run is not over while its
+terminals are still alive.
+
 ## Merge policy
 
-- CI green is the gate. Nothing red merges — better to test and fix than merge and break.
-- **github** tracker: squash-merge the PR (`gh pr merge --squash --delete-branch`) once green.
-- **linear** tracker with no remote: the worker's tests are the gate; merge the task branch into
-  the cockpit `main` locally (`git merge --squash <task-branch>`), push if a remote exists.
+- **The gate is whatever `docs/agents/setup.md` recorded** under `## Merge gate` — `github-actions`,
+  `local <command>`, or `unverified`. Nothing red merges, and nothing *unverified* merges quietly:
+  say which mode applied every time you merge. "CI green" is not a gate until you know a CI exists.
+- **github** tracker: squash-merge the PR (`gh pr merge --squash --delete-branch`) once the gate
+  holds.
+- **linear** tracker with no remote: merge the task branch into the cockpit `main` locally
+  (`git merge --squash <task-branch>`), push if a remote exists.
 - The coordinator merges, the worker never does. The merge is what unblocks dependents, so
   merge promptly after a `succeeded` report — a dependent blocked on an unmerged parent looks
   identical to a stuck run.

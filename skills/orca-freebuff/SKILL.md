@@ -51,7 +51,11 @@ Prefer `--json` for agent-driven calls. Never guess subcommands or flags from me
    per day). Check the banner in the TUI at launch ("unlimited" vs a session counter). Plan the
    run so a limited-mode fallback is acceptable.
 4. Confirm the run/task shape: this pattern works with an Orca Run + Tasks (from `/orca-tasks`
-   or the quick path). It does **not** need the repo's setup marker.
+   or the quick path).
+5. Read `docs/agents/setup.md` → `## Merge gate`. The freebuff model verifies nothing, so **you**
+   satisfy that gate before settling the dispatch (see "Settle the dispatch"). If the marker is
+   missing, route to `/orca-setup`: a free worker whose output nobody checks is worse than no
+   worker, and this is the one skill where the coordinator personally signs the result.
 
 ## Dispatch recipe
 
@@ -130,8 +134,14 @@ Because nothing in the freebuff terminal executes shell commands, the **orchestr
 worker_done from the cockpit, impersonating the worker terminal via `--from <handle>`. This is
 the one deliberate deviation from `/orca-orchestrate`, where the worker reports itself.
 
-Before sending, verify the work is real (the model can lie): `git status` / `git diff` in the
-task worktree, run the tests the plan requires.
+Before sending, verify the work is real — **the coordinator is the gate here, because nothing in
+the freebuff terminal can be trusted to verify itself**. The model can claim success it did not
+achieve, and unlike an Orca worker it never ran a `worker_done` contract. Check `git status` /
+`git diff` in the task worktree, then satisfy the mode recorded in `docs/agents/setup.md` under
+`## Merge gate` yourself: run the `ci: local <command>` command, or push and watch
+`gh pr checks` under `ci: github-actions` (remembering that `no checks reported` exits 0 and is a
+failed gate, not a pass). Quote the evidence in the `worker_done` body — you are signing it in the
+worker's name.
 
 ```bash
 orca orchestration send --type worker_done --subject succeeded --outcome succeeded \
