@@ -27,6 +27,12 @@ This is a **coordinator-driven** pattern (orchestrator sessions only): every ste
 from the cockpit. There is no worker agent in the freebuff terminal — anything you `terminal
 send` goes into the model prompt, never to a shell.
 
+Freebuff is **one of three worker runtimes** (`opencode`, `claude-code`, `freebuff`), chosen at
+setup and overridable per task in the plan. It is the only one that is not a supervised agent, and
+that is its whole cost: it reports nothing itself, verifies nothing itself, and cannot run while
+you are away. Use it where free matters more than autonomy — and reach for `/orca-orchestrate`
+with an agent runtime for everything else.
+
 ## Re-orient first
 
 `/orca-resume` if fresh. Verify the worktree guardrail: `orca worktree current --json` →

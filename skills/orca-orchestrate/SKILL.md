@@ -48,7 +48,9 @@ subcommands or flags from memory.
 2. Verify the setup marker exists (`docs/agents/setup.md`), else route to `/orca-setup`. Read
    its `## Merge gate` section now and keep it in mind for the whole run — it is what every
    `succeeded` report will be checked against. A marker with no merge gate predates this
-   contract: re-run `/orca-setup` rather than inventing one mid-run.
+   contract: re-run `/orca-setup` rather than inventing one mid-run. Read `## Worker runtime` at
+   the same time — it decides which launch recipe in `runtimes.md` you will use for every
+   dispatch, and a run whose default runtime is `freebuff` cannot be left unattended at all.
 3. Bind the Run (planned path):
    ```bash
    orca orchestration run-use --id <run_id> --json
@@ -77,17 +79,27 @@ creates gates deadlocks the DAG by construction.
    Every `ready` task has all its blockers merged on `main`. Dispatch each ready task to a
    worker in its own worktree — **one task = one branch = one worktree**, never the primary.
 
-   **Create the task worktree first**, then launch the `worker` profile in it, then bind the
-   dispatch (the `worker` profile is selected through config, not `--agent`, because opencode's
-   `-a <agent>` is broken in TUI mode):
+   **Pick the runtime, then create the worktree, launch the terminal, and bind the dispatch.** The
+   runtime is the coding agent that executes the task — `opencode`, `claude-code`, or `freebuff` —
+   and it is **independent of whichever agent you are orchestrating from**. Take the default from
+   `docs/agents/setup.md` (`## Worker runtime`), overridden by the task's `runtime:` in the plan.
+   **The exact launch command per runtime is in [`runtimes.md`](runtimes.md), next to this file.**
+   Read it rather than reconstructing a command here — each runtime has a trap (opencode's broken
+   `-a`, Claude Code's profile-vs-TUI distinction, freebuff's missing agent entirely).
+
+   The shape is the same for all three:
    ```bash
    # independent (no blockers) → top-level worktree; dependent → child worktree
    orca worktree create --name <slug> --no-parent --setup run --json
    # or: orca worktree create --name <slug> --parent-worktree active --setup run --json
-   orca terminal create --worktree id:<newWorktreeId> --title <slug> --command "OPENCODE_CONFIG_CONTENT='{\"default_agent\":\"worker\"}' opencode --auto -m <model>" --json
+   orca terminal create --worktree id:<newWorktreeId> --title <slug> --command "<per runtimes.md>" --json
    orca terminal wait --terminal <handle> --for tui-idle --timeout-ms 60000 --json
    orca orchestration worker-start --task <task_id> --terminal <handle> --worktree id:<newWorktreeId> --json
    ```
+   `freebuff` is the exception at the last step: it is not a recognised agent, so `worker-start`
+   and `dispatch --inject` refuse it and the coordinator drives it by hand — follow `/orca-freebuff`
+   end to end for that runtime, including verifying the work and signing the `worker_done` yourself.
+
    Use a fresh terminal per worker (one worktree = one branch = one worker). Reuse a worker
    terminal only for an immediate follow-up Task on the same worktree, and only when the plan
    allows it. Tasks the plan marked `isolated: no` are the sole exception to the worktree rule —
@@ -97,9 +109,9 @@ creates gates deadlocks the DAG by construction.
    later `terminal create`. Target only the agent handle; close a fallback shell only after
    `orca terminal list --worktree id:<id> --json` confirms it is an unused shell.
 
-   **Alternative — composed launch:** when the agent is not opencode (e.g. Claude Code) and its
-   `worker` profile can be the launched agent, `worker-start` can create the worktree and launch
-   in one call: `orca orchestration worker-start --task <task_id> --worktree new-top-level --name <slug> --agent <tui> --json`. Only use this when the launched TUI actually runs the permissive `worker` profile — otherwise the run stalls on permission prompts.
+   **Never take the `worker-start --agent <tui>` shortcut to skip `terminal create`.** `--agent`
+   launches a known TUI app; it does **not** select the permissive `worker` profile, so the run
+   stalls on permission prompts nobody is watching.
 2. **Wait** in rolling windows and process every message before acknowledging:
    ```bash
    orca orchestration check --wait --types worker_done,escalation,question --timeout-ms 900000 --json
@@ -217,14 +229,9 @@ terminals are still alive.
 
 ## Hard-won notes
 
-- opencode's `-a <agent>` is broken in TUI mode (prints help and exits) → pass the agent with
-  `OPENCODE_CONFIG_CONTENT='{"default_agent":"worker"}'` and add `--auto` as a safety net:
-  ```bash
-  OPENCODE_CONFIG_CONTENT='{"default_agent":"worker"}' opencode --auto -m <model>
-  ```
-  `worker-start --agent <tui>` launches the named TUI app; it does **not** select the permissive
-  `worker` profile. For opencode, select the profile with `OPENCODE_CONFIG_CONTENT` and bind via
-  `--terminal` (see the DAG loop).
+- Launch commands per runtime live in [`runtimes.md`](runtimes.md) — that file is the single
+  source for them, including why each runtime needs the shape it has. `worker-start --agent <tui>`
+  launches the named TUI app and never selects the permissive `worker` profile, on any runtime.
 - `worker-start --terminal <handle>` requires `--worktree` to match the terminal's worktree, or
   it fails with `terminal_worktree_mismatch`.
 - opencode defaults to prompting (`ask`) for `external_directory` and `doom_loop`; the `worker`

@@ -9,11 +9,17 @@ The suite was validated end-to-end in real runs: a Linear-tracked project and a 
 project each went setup → plan → tasks → orchestrate → merge with green tests, linked issues,
 and clean worktree teardown.
 
-Install with a single command:
+Install with a single command — **from outside a project directory, or with `--global`**:
 
 ```bash
-npx skills add adamelhirch/orca-skills
+cd ~ && npx -y skills add adamelhirch/orca-skills --global --skill '*' -y
 ```
+
+`skills add` auto-detects its scope and installs *project-locally* when run inside a repo, which
+drops a copy of the suite into that repo's working tree. Re-run the command to pick up updates:
+an existing install does not self-heal, so skills added since last time are simply absent (the
+slash command does not exist), and skills retired from the repo linger as ghosts until removed
+by hand (`rm -rf ~/.claude/skills/<name>`). New skills appear after the agent restarts.
 
 ## Pipeline
 
@@ -51,7 +57,7 @@ pipeline above is the current overview until the diagram is regenerated.
 | `/orca-status` | Read-only status sweep: what needs a decision (pending gates, dispatches past budget, failed tasks), the task DAG, in-flight workers with elapsed vs budget, leaked terminals, peeked mail, and the pipeline docs. Changes nothing and consumes no mail. The shared sweep `/orca-resume` and `/orca-handoff` both run. |
 | `/orca-handoff` | Write a durable project handoff (Orca state + plan + session context) so a fresh orchestrator session resumes without losing context. |
 | `/orca-resume` | Resume an Orca project: setup gate, load handoff + plan, reconcile with live Orca state, flag drift, re-anchor. |
-| `/orca-freebuff` | Dispatch tasks to free (ad-funded) Freebuff coding agents as terminal-driven TUI workers — no headless mode exists, so the orchestrator injects the prompt, polls for a completion marker, and impersonates `worker_done` from the cockpit. |
+| `/orca-freebuff` | Run the `freebuff` worker runtime: free (ad-funded) coding agents driven as terminal TUIs. No headless mode exists, so the orchestrator injects the prompt, polls for a completion marker, verifies the work itself, and impersonates `worker_done` from the cockpit. |
 
 ## Prerequisites
 
@@ -84,6 +90,41 @@ The pipeline is a **gate chain**: `/orca-plan`, `/orca-tasks`, and `/orca-orches
 run without `docs/agents/setup.md`, and `/orca-tasks` refuses a plan that is not `approved`. All
 skills are user-invoked (`disable-model-invocation: true`) so they only fire when an orchestrator
 calls them by name — never automatically in a worker session.
+
+## Worker runtimes
+
+A **worker runtime** is the coding agent that executes a task, chosen at setup and overridable
+per task in the plan. It is **independent of the orchestrator** — the orchestrator is simply
+whichever TUI you coordinate from, so a Claude Code cockpit can dispatch opencode workers and
+vice versa.
+
+| Runtime | Cost | Reports `worker_done` | Unattended |
+| --- | --- | --- | --- |
+| `opencode` | your provider key | itself | yes |
+| `claude-code` | Claude subscription/API | itself | yes |
+| `freebuff` | free (ad-funded) | **coordinator, impersonated** | no |
+
+The first two run the permissive `worker` profile installed by `/orca-setup` and follow the
+shared contract. `freebuff` has no agent in the terminal at all: the coordinator types the
+prompt, polls for a completion marker, verifies the work itself, and signs the result — free, but
+it needs you present. Launch recipes for all three ship with `/orca-orchestrate` (its
+`runtimes.md`); the freebuff loop is `/orca-freebuff`.
+
+### Choosing agents in Claude Code
+
+Claude Code's `/agents` wizard has been removed. The agents themselves still load normally from
+`~/.claude/agents/` (global) and `.claude/agents/` (per project) — `/orca-setup` installs the
+`worker` + `orchestrator` pair there:
+
+- **See what is installed**: `ls ~/.claude/agents/` — each file's frontmatter `name` is how the
+  agent is addressed.
+- **Use one**: name it in the prompt ("use the worker subagent for this"). Claude Code subagents
+  are *dispatched*, not selected for the session the way opencode primary agents are.
+- **Launch a session as one** (this is how a worker terminal is started):
+  `claude --agent worker --permission-mode bypassPermissions`.
+- **Create or change one**: ask Claude, or edit the file directly. For this suite, edit
+  `skills/orca-setup/agents/_shared/<role>-contract.md` and re-run `install-agents.sh` — never
+  the installed copy, which gets overwritten.
 
 ## Working model
 

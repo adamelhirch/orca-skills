@@ -90,10 +90,24 @@ Pick the flow by the state of the target directory:
    stalls a run on the host that is missing it, so **setup is not complete until it exits 0.**
    If a target `agents` directory did not exist when the agent session started, restart that
    agent once so the definitions are picked up.
-6. Verify the official guides are present (the skills load their command surface from the
-   Orca binary, never from this repo): `orca skills get orchestration` and
-   `orca skills get orca-cli` must both return the guides. If either fails, run
-   `orca skills install` first. This is a presence check only — the guides stay in the binary.
+6. Verify both layers of skills are present on this host:
+   - **The Orca binary guides** (the skills load their command surface from the binary, never
+     from this repo): `orca skills get orchestration` and `orca skills get orca-cli` must both
+     return the guides. If either fails, run `orca skills install` first. Presence check only —
+     the guides stay in the binary.
+   - **The pipeline skills themselves.** A host missing `/orca-plan` or `/orca-tasks` cannot run
+     the pipeline, and the symptom is confusing: the slash command simply does not exist. Check
+     `ls ~/.claude/skills/ | grep orca` (Claude Code) and the equivalent for other hosts, and
+     re-install what is missing:
+     ```bash
+     cd ~ && npx -y skills add adamelhirch/orca-skills --global --skill '*' -y
+     ```
+     Two traps worth knowing. **Run it from outside a project directory, or pass `--global`** —
+     `skills add` auto-detects scope and installs *project-locally* when run inside a repo,
+     which drops a copy of the suite into that repo's working tree. And **an old install does
+     not self-heal**: skills added since the last install are simply absent, and skills deleted
+     from the repo (e.g. the retired `orca-worker`) stay behind as ghosts until removed by hand
+     (`rm -rf ~/.claude/skills/<name>`). New skills only appear after the agent restarts.
 7. **Record the issue tracker.** Ask the user which tracker to use. The two supported trackers
    are **github** (via `gh`) and **linear** (via the native `orca linear` CLI). There is no
    markdown tracker and no "none" choice — issue tracking lives in the tracker itself. Record
@@ -114,7 +128,24 @@ Pick the flow by the state of the target directory:
    **The two trackers are exclusive.** One project mirrors to exactly one tracker — `github` or
    `linear`, never both. With `github`, only `gh` issues are created; with `linear`, only Linear
    issues. An empty GitHub issue list on a linear-tracker project is expected, not a bug.
-8. **Determine and record the merge gate.** "CI green" is meaningless until you know what runs
+8. **Choose the worker runtime.** This is *what runs the tasks*, and it is **independent of the
+   orchestrator** — the orchestrator is simply whichever TUI you coordinate from. Ask the user
+   which runtime the workers should use by default; the plan can override it per task:
+   - **`opencode`** (default) — permissive `worker` profile, broad model choice, reports its own
+     `worker_done`.
+   - **`claude-code`** — the `worker` agent installed in `~/.claude/agents/`, reports its own
+     `worker_done`.
+   - **`freebuff`** — free and ad-funded, but there is **no agent in the terminal**: the
+     coordinator types the prompt, polls for a completion marker, verifies the work itself, and
+     signs the `worker_done` in the worker's name. It cannot run unattended. Only record it as
+     the default when the user wants free workers knowing that cost; otherwise leave it as a
+     per-task override.
+
+   Confirm the chosen runtime is actually usable before recording it: the agent pair installed in
+   step 5 for `opencode`/`claude-code`, or `freebuff --version` plus a logged-in session for
+   `freebuff`. The dispatch recipes for all three ship with `/orca-orchestrate` (its
+   `runtimes.md`) — this step only records the choice.
+9. **Determine and record the merge gate.** "CI green" is meaningless until you know what runs
    here — and it degrades silently: `gh pr checks` prints `no checks reported` and **exits 0** on
    a repo with no workflows, so a worker that trusts the exit code reports success having run
    nothing. Resolve the gate now, at setup, where a human is present. Probe, then confirm with
@@ -138,13 +169,14 @@ Pick the flow by the state of the target directory:
    A repo with tests but no recorded gate is the failure this step exists to prevent. If the
    probe finds workflows *and* the user names a local command, prefer `github-actions` and note
    the local command alongside it.
-9. Write the setup marker `docs/agents/setup.md` (create the `docs/agents` directory if
+10. Write the setup marker `docs/agents/setup.md` (create the `docs/agents` directory if
    missing). It records everything the rest of the pipeline relies on:
    ```
    # Orca setup — <repo> — <date>
 
    ## Primary worktree   (selector / display name of the cockpit worktree)
    ## Repo               (remote or "local-only")
+   ## Worker runtime     (opencode | claude-code | freebuff — the default for this project)
    ## Merge gate         (ci: github-actions | ci: local <command> | ci: unverified — verbatim)
    ## Conventions        (one-task-one-branch, TDD by default)
    ## Issue tracker      (github | linear — with workspace id + team key for linear)
@@ -152,7 +184,7 @@ Pick the flow by the state of the target directory:
    ## Guides             (orca orchestration + orca-cli present in the binary)
    ## Status             (setup complete | skipped — <reason>)
    ```
-10. Point the primary worktree card at it:
+11. Point the primary worktree card at it:
    `orca worktree set --worktree <primary-selector> --comment "setup → docs/agents/setup.md"`.
 
 ## What appears in Orca's Tasks tab
@@ -174,7 +206,10 @@ task appears in the Tasks tab under the chosen tracker.
   confirmed present), `local <command>` (command run once and confirmed), or `unverified`
   (explicitly accepted by the user, with the reason). A project whose gate is unrecorded cannot
   be orchestrated — the worker has no definition of "verified".
-- The official guides (`orca orchestration`, `orca-cli`) are confirmed present in the binary.
+- The official guides (`orca orchestration`, `orca-cli`) are confirmed present in the binary, and
+  every pipeline skill is installed for this host (no missing skill, no ghost of a retired one).
+- The **worker runtime** default is recorded and confirmed usable, chosen independently of
+  whichever agent the orchestrator is running in.
 - The tracker is recorded in `docs/agents/setup.md`: **github** with a confirmed remote, or
   **linear** with a concrete `workspace` id + `team` key chosen by the user from
   `orca linear team list --workspace all`. Setup is not complete otherwise.
