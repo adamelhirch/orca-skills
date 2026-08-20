@@ -26,15 +26,13 @@ orca skills get orchestration
 
 ## Steps
 
-1. Capture the live Orca state (read-only, `--json`):
-   - Current worktree, branch, HEAD, and card comment:
-     `orca worktree current --json` / `orca worktree show --worktree current --json`
-   - Live checkouts and terminals:
-     `orca worktree ps --json`, `orca terminal list --json`
-   - Coordination, if a Run is bound: `orca orchestration run-list --json`; for the run,
-     `orca orchestration task-list --run <id> --json` (tasks + statuses), unsettled dispatches
-     (`dispatch-show --task <id>`), and unread mail (`orca orchestration check --unread --inject`).
-     Capture a compact summary, not a dump.
+1. Capture the live Orca state with the **`/orca-status` sweep** — that skill owns the read-only
+   reconstruction (cockpit worktree/branch/HEAD/card, run + task statuses, unsettled dispatches,
+   pending gates, terminal accounting including `reclaimable` leaks, peeked mail). Capture its
+   compact summary, not a JSON dump, and do not hand-roll a second copy of the sweep here.
+
+   Mail is read with `check --peek`, never `--unread` and never `--ack`: a handoff that consumes
+   the mailbox hands the next session a run whose messages have silently disappeared.
 2. Capture the session context from this conversation: what was done, decisions made, open
    threads, and next steps. Reference artifacts by path instead of duplicating them
    (CONTEXT.md, docs/adr/, issues, PRs, specs, and the pipeline docs — `docs/agents/plan.md`,
@@ -51,8 +49,9 @@ orca skills get orchestration
 
 ## Summary            (2-3 lines: where the project stands)
 ## Orca state         (worktree/branch/HEAD, card comment, live terminals)
-## Coordination       (run objective, tasks + statuses, unsettled dispatches, unread mail)
-## Plan               (plan.md status + path; setup.md conventions in force)
+## Coordination       (run objective, tasks + statuses, unsettled dispatches, pending gates,
+                      unread mail, terminals still live)
+## Plan               (plan.md status + path; setup.md conventions and merge-gate mode in force)
 ## Decisions          (what was decided; reference docs/adr/ or issues by path)
 ## In progress / next (open threads, next steps, who owns what)
 ## Suggested skills   (orca-resume, orca-orchestrate, ...)
@@ -62,4 +61,6 @@ orca skills get orchestration
 
 - Every section comes from a verified Orca read or this session's context, never from memory.
 - The rolling file, the snapshot, and the card comment are all written and consistent.
+- Pending gates and still-live terminals are named — a handoff that omits them hands the next
+  session a run that looks idle but is actually blocked or leaking.
 - No secret is present in the document.

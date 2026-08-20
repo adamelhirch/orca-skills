@@ -32,14 +32,18 @@ orca skills get orchestration
    `docs/agents/handoffs/`. Load it as the working context. If present, also load
    `docs/agents/plan.md` (the current plan, approved or draft) and `docs/agents/setup.md` (the
    conventions in force) — they are part of the durable pipeline state.
-2. Reconcile it against live Orca state:
-   - `orca worktree current --json` / `orca worktree show --worktree current --json`
-     (worktree, branch, HEAD, card comment)
-   - `orca worktree ps --json`, `orca terminal list --json`
-   - Coordination, if a Run is bound: `orca orchestration run-list --json`, then
-     `task-list --run <id> --json` and `orca orchestration check --unread --inject`.
-   - Flag every drift between the document and reality: a `worker_done` received since the
-     handoff, a changed comment, a merged branch, a closed terminal, an advanced Run.
+2. Reconcile it against live Orca state by running the **`/orca-status` sweep** — that skill owns
+   the read-only reconstruction (cockpit, run + DAG, unsettled dispatches with elapsed vs budget,
+   pending gates, terminal accounting, peeked mail). Do not re-derive it here; a second hand-rolled
+   copy of the sweep is how the two drift apart.
+
+   Note in particular: mail is read with `check --peek` (unread **without** marking read), never
+   `--unread` and never `--ack`. Consuming the mailbox while orienting loses a `worker_done` that
+   the coordinator still has to act on.
+
+   Then flag every drift between the document and reality: a `worker_done` received since the
+   handoff, a changed comment, a merged branch, a closed terminal, an advanced Run, a gate opened
+   while nobody was watching.
 3. Produce the resume: the project, the current worktree/branch, the last known status, the
    open threads, and the next steps — corrected by the drift. Set the working method: comment
    milestones on the card (`orca worktree set --worktree active --comment ...`); keep the
@@ -56,5 +60,7 @@ so — the context is thinner and everything above comes from the reads alone.
 - The summary names the project, the current worktree/branch, and its last status — all from
   verified reads, not inference.
 - Every drift between the handoff document and live state is called out, including the state of
-  `docs/agents/plan.md` (approved/draft) and `docs/agents/setup.md`.
+  `docs/agents/plan.md` (approved/draft) and `docs/agents/setup.md` — its `## Merge gate` mode is
+  named out loud, because it decides what the next run is allowed to merge.
+- Nothing was consumed while orienting: no mail acked, no gate resolved.
 - The next steps and ownership are unambiguous, and the card comment reflects the resume.

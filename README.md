@@ -19,9 +19,16 @@ npx skills add adamelhirch/orca-skills
 
 ```
 /orca-setup  →  /orca-plan  →  /orca-tasks  →  /orca-orchestrate  →  /orca-handoff
-(hookup)       (brainstorm)    (Run+Tasks)     (dispatch+DAG+merge)    (durable state)
+(hookup+gate)  (brainstorm)    (Run+Tasks)     (dispatch+DAG+merge)    (durable state)
                     └─────────────────────── /orca-resume in the next session
+
+/orca-status — read-only, any time: what needs a decision, in flight, leaked terminals
+/orca-freebuff — dispatch a task to a free TUI worker instead of an Orca agent
 ```
+
+`/orca-orchestrate` blocks until a message arrives, so it tells you nothing in between.
+`/orca-status` is the instrument for every other moment, and it is the same sweep `/orca-resume`
+and `/orca-handoff` run — one implementation, three callers.
 
 An interactive diagram of the pipeline (open in a browser) lives at
 [`docs/diagrams/orca-pipeline.html`](docs/diagrams/orca-pipeline.html), with a PNG export
@@ -29,7 +36,9 @@ An interactive diagram of the pipeline (open in a browser) lives at
 
 ![Orca orchestration pipeline](docs/diagrams/orca-pipeline.png)
 
-The diagram shows the main path, the per-tracker mirror, and the failure gate.
+The diagram covers the **five-step main path** — the per-tracker mirror and the failure gate
+included. It predates `/orca-status` and `/orca-freebuff` and does not show them; the ASCII
+pipeline above is the current overview until the diagram is regenerated.
 
 ## Skills
 
@@ -39,6 +48,7 @@ The diagram shows the main path, the per-tracker mirror, and the failure gate.
 | `/orca-plan` | Brainstorm a run with the user before any worker runs: grill the objective (design tree, rounds, recommendations), settle test seams and isolation per task, write `docs/agents/plan.md`, and get explicit approval. |
 | `/orca-tasks` | Turn an approved plan into an Orca Run and its Tasks with `--deps` edges (1:1, stable ids), plus the tracker issue mirror. Creates the namespace only — never launches a worker. |
 | `/orca-orchestrate` | Coordinator runbook: bind the Run, sweep `task-list --ready`, dispatch one-task-one-branch to `worker` terminals, watchdog `check --wait`, gate failures, merge green task branches, release workers. Quick path for 1-2 task runs. |
+| `/orca-status` | Read-only status sweep: what needs a decision (pending gates, dispatches past budget, failed tasks), the task DAG, in-flight workers with elapsed vs budget, leaked terminals, peeked mail, and the pipeline docs. Changes nothing and consumes no mail. The shared sweep `/orca-resume` and `/orca-handoff` both run. |
 | `/orca-handoff` | Write a durable project handoff (Orca state + plan + session context) so a fresh orchestrator session resumes without losing context. |
 | `/orca-resume` | Resume an Orca project: setup gate, load handoff + plan, reconcile with live Orca state, flag drift, re-anchor. |
 | `/orca-freebuff` | Dispatch tasks to free (ad-funded) Freebuff coding agents as terminal-driven TUI workers — no headless mode exists, so the orchestrator injects the prompt, polls for a completion marker, and impersonates `worker_done` from the cockpit. |
