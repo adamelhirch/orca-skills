@@ -1,2 +1,5 @@
 .DS_Store
 node_modules/
+
+# Generated diagram QA artifacts (archify visual-check passes) — regenerate, don't commit
+docs/diagrams/*.visual-check.*
