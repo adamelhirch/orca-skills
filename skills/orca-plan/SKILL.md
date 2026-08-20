@@ -64,9 +64,14 @@ silently assumed. Do not write the plan before the user confirms the shared unde
   worktree unless marked.
 - **Agent + model** — which agent runs which task (default: the `worker` agent, opencode
   unless the run says otherwise), and any model/effort choices.
-- **Merge policy** — the tracker in `docs/agents/setup.md` decides the merge path: **github**
-  → CI-green gate + squash-merge the PR; **linear** (local-only) → the worker's tests are the
-  gate, merge the branch into `main` locally. Confirm the gate with the user in the interview.
+- **Merge policy** — `docs/agents/setup.md` already records the **merge gate** (`github-actions`,
+  `local <command>`, or `unverified`) and the **tracker**, which decides the merge path: **github**
+  → squash-merge the PR; **linear** (local-only) → merge the branch into `main` locally. Read the
+  recorded gate back to the user in the interview and confirm it still holds for this run — a run
+  planned against `unverified` needs saying out loud before any task is cut.
+- **Time budget per task** — how long a task may run before a stuck worker becomes a decision for
+  the user (default 60 min). `/orca-orchestrate` climbs its escalation ladder off this number;
+  without one, a stuck dispatch waits forever and the run looks healthy.
 
 ## Write the plan
 
@@ -87,6 +92,7 @@ Write `docs/agents/plan.md` (rolling, overwrite) with this schema:
 - blocked-by: <ids or none>
 - agent: <default worker>
 - isolated: <yes|no — no means it runs in the primary worktree>
+- budget: <minutes before a non-settling worker escalates to a user gate; default 60>
 
 ## Status
 draft → approved (date) — set to approved only after the user approves in conversation
@@ -107,5 +113,6 @@ a plan that is not approved. Approval is a doc state, not an Orca gate — it su
 
 - The frontier is empty: no decision left silently assumed.
 - `docs/agents/plan.md` exists, approved, with stable task ids, dependency edges, test seams,
-  isolation flags, and agent choices.
+  isolation flags, agent choices, and a time budget per task.
+- The merge gate recorded at setup was read back to the user and confirmed for this run.
 - The user has confirmed the shared understanding in conversation.

@@ -93,7 +93,50 @@ for (const skill of skills) {
   }
 }
 
-// --- 4. relative links resolve ----------------------------------------------------------------
+// --- 4. the agent contract stays single-sourced -----------------------------------------------
+// Installed agents are composed from a host header + one shared contract per role. The failure
+// this guards against is the one the layout replaced: a rule fixed in one host file and forgotten
+// in the other. If a contract heading reappears in a host header, the split has started to rot.
+const AGENTS = "skills/orca-setup/agents";
+const CONTRACT_HEADINGS = [
+  "## Mandatory lifecycle rules",
+  "## TDD discipline",
+  "## The merge gate",
+  "## Mandatory worktree guardrail",
+  "## Your lifecycle",
+  "## Rules",
+];
+
+for (const role of ["worker", "orchestrator"]) {
+  const contract = `${AGENTS}/_shared/${role}-contract.md`;
+  if (!existsSync(join(ROOT, contract))) {
+    fail(contract, `missing shared ${role} contract — installed agents would carry no behaviour rules`);
+    continue;
+  }
+  for (const host of ["claude", "opencode"]) {
+    const header = `${AGENTS}/${host}/${role}.md`;
+    if (!existsSync(join(ROOT, header))) {
+      fail(header, `missing ${host} host header for the ${role} agent`);
+      continue;
+    }
+    const source = read(header);
+    if (!frontmatter(source)) fail(header, "host header must open with a frontmatter block");
+    for (const heading of CONTRACT_HEADINGS) {
+      if (source.includes(heading)) {
+        fail(header, `"${heading}" belongs in _shared/${role}-contract.md — a host header must not restate the contract`);
+      }
+    }
+  }
+}
+
+const installer = "skills/orca-setup/install-agents.sh";
+if (!existsSync(join(ROOT, installer))) {
+  fail(installer, "missing agent composer — /orca-setup step 5 calls it");
+} else if (!(statSync(join(ROOT, installer)).mode & 0o111)) {
+  fail(installer, "agent composer is not executable");
+}
+
+// --- 5. relative links resolve ----------------------------------------------------------------
 function markdownFiles(dir) {
   const found = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
