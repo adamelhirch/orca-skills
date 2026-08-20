@@ -121,6 +121,25 @@ so `external_directory`/`doom_loop` are allowed (opencode), `--auto` and
 orchestration worker, not a defect. Scope it accordingly: worker terminals run only dispatches
 the orchestrator injects, in ephemeral worktrees that the orchestrator removes after merge.
 
+## Validating this repo
+
+The suite tells other projects that nothing red merges, so it holds itself to the same rule. CI
+runs one check on every PR:
+
+```bash
+node scripts/validate-skills.mjs
+```
+
+It asserts the structural invariants that prose cannot: every `skills/*/SKILL.md` has frontmatter
+whose `name` matches its directory, a routable `description`, and `disable-model-invocation: true`;
+every skill on disk is listed in `skills.sh.json` **and** in the skills table above; and every
+relative link in every Markdown file resolves. A skill that exists but ships nowhere is the
+failure mode this catches.
+
+Version-specific workarounds encoded in the skills (the `gh` dependency-link gap, opencode's
+broken `-a` in TUI mode, freebuff's missing headless mode) are recorded with their verified
+versions and retest triggers in [`docs/COMPAT.md`](docs/COMPAT.md).
+
 ## Notes
 
 - `npx skills add` installs copies; re-run it to pick up repo updates.
