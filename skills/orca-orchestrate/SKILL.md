@@ -100,6 +100,12 @@ creates gates deadlocks the DAG by construction.
    and `dispatch --inject` refuse it and the coordinator drives it by hand — follow `/orca-freebuff`
    end to end for that runtime, including verifying the work and signing the `worker_done` yourself.
 
+   **Serialize the `freebuff` tasks.** Freebuff allows one instance per machine, so at most one
+   `freebuff` dispatch may be live at any moment: launch it, settle it, close its terminal, then
+   launch the next. Ready tasks on the other runtimes still go out in parallel alongside it. And
+   before each freebuff launch, check the session window covers the task's `budget:` — the details
+   are in `/orca-freebuff`.
+
    Use a fresh terminal per worker (one worktree = one branch = one worker). Reuse a worker
    terminal only for an immediate follow-up Task on the same worktree, and only when the plan
    allows it. Tasks the plan marked `isolated: no` are the sole exception to the worktree rule —

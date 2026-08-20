@@ -68,6 +68,11 @@ silently assumed. Do not write the plan before the user confirms the shared unde
   is worth it — cheap mechanical work to `freebuff`, design-sensitive work to a paid runtime —
   and remember a `freebuff` task needs the coordinator present to poll and sign it, so it must
   not sit on the critical path of an unattended stretch. Settle model/effort choices here too.
+
+  Two `freebuff` specifics change the shape of a plan, not just its cost: only **one** freebuff
+  worker can run on a machine at a time, so several freebuff tasks are a queue costing the **sum**
+  of their budgets in wall-clock; and each runs inside a **one-hour session window**, so no single
+  freebuff task may be budgeted beyond what that window holds. Say both out loud before approval.
 - **Merge policy** — `docs/agents/setup.md` already records the **merge gate** (`github-actions`,
   `local <command>`, or `unverified`) and the **tracker**, which decides the merge path: **github**
   → squash-merge the PR; **linear** (local-only) → merge the branch into `main` locally. Read the

@@ -14,12 +14,22 @@ you want to work in, and the runtime for the cost and capability the tasks need.
 | --- | --- | --- | --- | --- |
 | `opencode` | your provider key | `~/.config/opencode/agents/worker.md` | itself | the default; broad model choice |
 | `claude-code` | Claude subscription/API | `~/.claude/agents/worker.md` | itself | tasks wanting Claude Code's tooling |
-| `freebuff` | free (ad-funded) | none — no agent in the terminal | **coordinator, impersonated** | throwaway or bulk tasks where free matters |
+| `freebuff` | free (ad-funded) | none — no agent in the terminal | **coordinator, impersonated** | throwaway tasks where free matters — **one at a time** |
 
 `opencode` and `claude-code` are *supervised agent* runtimes: they run the permissive `worker`
 profile installed by `/orca-setup`, follow the shared contract, and send their own `worker_done`.
 `freebuff` is a *driven TUI* runtime: there is no agent, the coordinator types into it and signs
 the result. That difference is the whole reason to prefer the first two by default.
+
+`freebuff` also carries two hard limits the others do not, both verified on this toolchain:
+
+- **One instance per machine.** A second freebuff refuses to start (`Freebuff is already running`,
+  offering to *take over* — which kills the first). Freebuff tasks are therefore **strictly
+  serial**: dispatch one, settle it, close its terminal, then dispatch the next.
+- **A one-hour wall-clock session window.** The banner shows the minutes left; they decay whether
+  you work or not. A task whose budget exceeds the minutes left must not be dispatched.
+
+Both are detailed in `/orca-freebuff`.
 
 ## Dispatch recipes
 
@@ -64,7 +74,10 @@ Launch the terminal yourself and bind with `--terminal`.
 
 Freebuff has no headless mode and is not a recognised Orca agent, so `worker-start` and
 `dispatch --inject` both refuse it with `agent_unconfigured`. It is dispatched without injection
-and settled by the coordinator. The full recipe — marker contract, polling loop, impersonated
+and settled by the coordinator. Before launching, confirm no other instance holds the machine
+(`pgrep -fl freebuff`) and that the session window covers the task's budget — the lock file
+`~/.config/manicode/freebuff-instance-owner.json` is not cleaned up on exit, so probe the process,
+not the file. The full recipe — marker contract, polling loop, impersonated
 `worker_done`, and the verification the coordinator must perform itself — is
 the `/orca-freebuff` skill. Read that skill before dispatching this
 runtime; the summary here is not enough to run it.
@@ -76,6 +89,9 @@ cheap mechanical tasks to `freebuff` and its design-sensitive ones to `claude-co
 
 - **Never put a `freebuff` task on the critical path of an unattended stretch.** It needs the
   coordinator present to poll for the marker and sign the result.
+- **Freebuff tasks never run in parallel — with each other.** One instance per machine means a set
+  of ready `freebuff` tasks is a queue, not a fan-out, and costs the *sum* of their budgets in
+  wall-clock. Tasks on the other runtimes still run alongside them.
 - **State the runtime in the task spec**, not just the plan metadata. A worker that knows it is
   the free tier behaves differently from one that assumes it is not, and the dispatch record is
   what a later handoff reads.
