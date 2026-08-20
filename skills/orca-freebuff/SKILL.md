@@ -52,16 +52,88 @@ Prefer `--json` for agent-driven calls. Never guess subcommands or flags from me
    (Freebuff needs no account to *download*, but a logged-in session is what unlocks the model
    picker and "unlimited" DeepSeek V4 Flash). If absent, run `freebuff login` once in a regular
    terminal before the run.
-3. Session quotas: freebuff is ad-funded with per-day premium sessions; outside full-access
-   regions it falls back to **limited mode** (DeepSeek V4 Flash / MiMo 2.5, 6 one-hour sessions
-   per day). Check the banner in the TUI at launch ("unlimited" vs a session counter). Plan the
-   run so a limited-mode fallback is acceptable.
-4. Confirm the run/task shape: this pattern works with an Orca Run + Tasks (from `/orca-tasks`
+3. **No other freebuff instance is running.** Freebuff allows exactly one instance per machine
+   and refuses the second outright — see "Serial by construction" below. Probe before launching:
+   ```bash
+   pgrep -fl freebuff | grep -v pgrep     # any live instance?
+   orca terminal list --json              # any Orca terminal already running freebuff?
+   ```
+   Do **not** trust `~/.config/manicode/freebuff-instance-owner.json` on its own: the lock file
+   survives the process, so a dead `pid` sits there after every exit and would read as "busy".
+   The process probe is the truth; the lock file only tells you who claimed it last.
+4. **Enough time left in the session window.** The freebuff session is a **one-hour wall-clock
+   window**, not a task counter — see "The session window" below. Read the banner at launch and
+   compare the remaining minutes to the task's `budget:`:
+   ```
+   1 of 1 premium sessions used · resets in 4h 26m
+   DeepSeek V4 Flash 07/31 · 42m left
+   ```
+   If `budget > minutes left`, do **not** dispatch. Raise a decision gate: wait for the reset,
+   shrink the task, or send it to another runtime. A task that runs out of window mid-flight
+   leaves a half-finished worktree and no `worker_done`.
+5. Region/tier: freebuff is ad-funded. Supported regions get full access; unsupported regions and
+   detected VPNs fall back to a limited tier with capped daily sessions and lighter models. The
+   banner is what tells you which one you are on — read it, do not assume.
+6. Confirm the run/task shape: this pattern works with an Orca Run + Tasks (from `/orca-tasks`
    or the quick path).
-5. Read `docs/agents/setup.md` → `## Merge gate`. The freebuff model verifies nothing, so **you**
+7. Read `docs/agents/setup.md` → `## Merge gate`. The freebuff model verifies nothing, so **you**
    satisfy that gate before settling the dispatch (see "Settle the dispatch"). If the marker is
    missing, route to `/orca-setup`: a free worker whose output nobody checks is worse than no
    worker, and this is the one skill where the coordinator personally signs the result.
+
+## Serial by construction
+
+**Freebuff allows exactly one instance per machine.** Launching a second one does not consume a
+second session and does not queue — it refuses:
+
+```
+Freebuff is already running
+Only one freebuff instance is allowed at a time.
+        [ Take over ]  [ Exit ]
+```
+
+"Take over" **kills the running instance**. On a coordinated run that means killing a worker
+mid-task, losing its uncommitted work, and leaving a dispatch that will never settle. Never
+choose it to make room for a new dispatch.
+
+The consequence is a hard scheduling rule the rest of the pipeline does not have:
+
+- **Never dispatch two `freebuff` tasks concurrently.** When `task-list --ready` returns several
+  ready tasks whose `runtime:` is `freebuff`, dispatch them **one at a time**, each settled and
+  its terminal closed before the next launches. Other runtimes stay parallel — only freebuff
+  serializes.
+- **A `freebuff` task must not sit on the critical path of a parallel fan-out**, because the
+  fan-out is not one: it is a queue.
+- When planning (`/orca-plan`), a run with several `freebuff` tasks costs the **sum** of their
+  budgets in wall-clock, not the max. Say so before the plan is approved.
+
+The instance lock lives in `~/.config/manicode/freebuff-instance-owner.json` (`instanceId` +
+`pid`) and **is not cleaned up on exit** — a dead pid stays in the file. Probe the process, not
+the file (see pre-flight).
+
+## The session window
+
+A freebuff session is **one hour of wall-clock time**, and it is the only thing that is scarce.
+Measured directly:
+
+| Event | Banner |
+| --- | --- |
+| New terminal launched into a session started ~18 min earlier | `DeepSeek V4 Flash 07/31 · 42m left` |
+| After a 20-second task completed | `41m left` |
+| Minutes later, idle | `40m left`, then `37m left` |
+
+What this means, and it is the opposite of what the folklore says:
+
+- **A task does not consume a session.** The window decays in real time whether you work or not.
+- **Launching another terminal inside the window does not open a new session.** It joins the one
+  already running, with its countdown already spent. So closing and relaunching a freebuff
+  terminal within the hour costs nothing.
+- **`N of N premium sessions used · resets in <h>` is a separate, premium-tier counter.** It does
+  not move when you run tasks on the free Flash tier; do not read it as your remaining budget.
+
+So the budget question is never "how many tasks left" — it is **"do the minutes left cover this
+task's budget?"** Check it at pre-flight, and again before any follow-up dispatch in the same
+window.
 
 ## Dispatch recipe
 
@@ -177,8 +249,14 @@ dispatch — see "Settle the dispatch".)
   drifted. One bounded re-request (above), then a **decision gate to the user** (retry / fix
   forward / abandon). Never silently redispatch.
 - **Model edits unrelated files** → gate with the diff shown.
-- **Session cap hit** (limited-mode counter exhausted) → surface to the user before more tasks;
-  either wait for the next window or plan fewer premium sessions.
+- **Session window runs out mid-task** → the worker stops answering and no marker ever arrives.
+  Do not retry blindly into an exhausted window: read the banner, and gate to the user with the
+  reset time (wait, shrink the task, or move it to another runtime).
+- **`Freebuff is already running`** → another instance holds the machine lock. Find it
+  (`pgrep -fl freebuff`, `orca terminal list --json`) and let it finish. **Never press "Take
+  over"** during a run: it kills a live worker and orphans its dispatch. If the lock is stale
+  (process dead, file left behind), relaunching is safe — the probe in pre-flight distinguishes
+  the two.
 
 ## Why this pattern (and not the alternatives)
 
@@ -189,9 +267,11 @@ dispatch — see "Settle the dispatch".)
 | `worker-start` / `dispatch --inject` | Refuse non-agent terminals (`agent_unconfigured`). |
 | `dispatch --to` without injection + manual prompt | **Works** — this skill. |
 | Trusting `tui-idle` alone | Not a completion signal — marker + polling required. |
+| Running freebuff workers in parallel | Impossible — one instance per machine; the second is refused with Take over / Exit. |
 
 ## Done when
 
 - A task was dispatched to a freebuff TUI worker, the marker appeared, `worker_done` (impersonated)
-  settled it as `completed`, and the worktree/terminal are cleaned up.
+  settled it as `completed`, and the worktree/terminal are cleaned up — the terminal especially,
+  since its instance lock is what blocks the next freebuff task.
 - The user saw the task result and the merged (or gated) outcome.
