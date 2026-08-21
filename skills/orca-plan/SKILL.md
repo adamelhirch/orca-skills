@@ -63,7 +63,8 @@ silently assumed. Do not write the plan before the user confirms the shared unde
   non-isolated (integration pass, validate current branch). Tasks never run on the primary
   worktree unless marked.
 - **Worker runtime + model** — which runtime executes each task. The default comes from
-  `docs/agents/setup.md` (`## Worker runtime`: `opencode`, `claude-code`, or `freebuff`) and is
+  `docs/agents/setup.md` (`## Worker runtime`: `opencode`, `claude-code`, `grok`, or `freebuff`) and
+  is
   independent of the agent the orchestrator itself runs in. Override it per task when the mix
   is worth it — cheap mechanical work to `freebuff`, design-sensitive work to a paid runtime —
   and remember a `freebuff` task needs the coordinator present to poll and sign it, so it must
@@ -99,7 +100,7 @@ Write `docs/agents/plan.md` (rolling, overwrite) with this schema:
 ### <id>: <title>
 - spec: <one-paragraph worker brief, including the test seam and TDD expectations>
 - blocked-by: <ids or none>
-- runtime: <opencode|claude-code|freebuff — default: the setup marker's worker runtime>
+- runtime: <opencode|claude-code|grok|freebuff — default: the setup marker's worker runtime>
 - isolated: <yes|no — no means it runs in the primary worktree>
 - budget: <minutes before a non-settling worker escalates to a user gate; default 60>
 

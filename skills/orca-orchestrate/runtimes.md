@@ -14,10 +14,12 @@ you want to work in, and the runtime for the cost and capability the tasks need.
 | --- | --- | --- | --- | --- |
 | `opencode` | your provider key | `~/.config/opencode/agents/worker.md` | itself | the default; broad model choice |
 | `claude-code` | Claude subscription/API | `~/.claude/agents/worker.md` | itself | tasks wanting Claude Code's tooling |
+| `grok` | xAI account | `~/.grok/agents/worker.md` | itself | another supervised agent runtime; has a real headless mode |
 | `freebuff` | free (ad-funded) | none — no agent in the terminal | **coordinator, impersonated** | throwaway tasks where free matters — **one at a time** |
 
-`opencode` and `claude-code` are *supervised agent* runtimes: they run the permissive `worker`
-profile installed by `/orca-setup`, follow the shared contract, and send their own `worker_done`.
+`opencode`, `claude-code`, and `grok` are *supervised agent* runtimes: they run the permissive
+`worker` profile installed by `/orca-setup`, follow the shared contract, and send their own
+`worker_done`.
 `freebuff` is a *driven TUI* runtime: there is no agent, the coordinator types into it and signs
 the result. That difference is the whole reason to prefer the first two by default.
 
@@ -70,6 +72,25 @@ Do **not** reach for `worker-start --agent claude` as a shortcut: `--agent` laun
 app, it does not select the permissive `worker` profile, so the run stalls on permission prompts.
 Launch the terminal yourself and bind with `--terminal`.
 
+### `grok`
+
+Grok selects the profile with `--agent` and uses the same `permission_mode: bypassPermissions` name
+as Claude Code. The profile already carries it; passing `--always-approve` is the safety net
+equivalent to opencode's `--auto`:
+
+```bash
+orca terminal create --worktree id:<wtId> --title <slug> \
+  --command "grok --agent worker --always-approve" --json
+orca terminal wait --terminal <handle> --for tui-idle --timeout-ms 60000 --json
+orca orchestration worker-start --task <task_id> --terminal <handle> --worktree id:<wtId> --json
+```
+
+Grok reads agent definitions from `~/.grok/agents/` (user) and `.grok/agents/` (project). It also
+discovers `~/.claude/agents/` — but as **subagents**, not as the session profile, so the Grok header
+in `~/.grok/agents/` is what `--agent worker` resolves. Grok additionally has a genuine headless
+mode (`-p "<prompt>"`, `--prompt-file`), unlike freebuff; the supervised pattern still uses a TUI
+terminal so the worker can send its own `worker_done` from where it runs.
+
 ### `freebuff`
 
 Freebuff has no headless mode and is not a recognised Orca agent, so `worker-start` and
@@ -85,7 +106,8 @@ runtime; the summary here is not enough to run it.
 ## Mixing runtimes in one run
 
 The plan's per-task `runtime:` field overrides the setup default, so a single run can send its
-cheap mechanical tasks to `freebuff` and its design-sensitive ones to `claude-code`. Two rules:
+cheap mechanical tasks to `freebuff` and its design-sensitive ones to `claude-code` or `grok`.
+Two rules:
 
 - **Never put a `freebuff` task on the critical path of an unattended stretch.** It needs the
   coordinator present to poll for the marker and sign the result.
