@@ -61,7 +61,7 @@ pipeline above is the current overview until the diagram is regenerated.
 | --- | --- |
 | `/orca-setup` | Hook a project up to Orca orchestration: register the repo (new empty project or existing repo), create/link a GitHub repo when none exists (asking public/private), install the `worker` + `orchestrator` agent pairs, and record the tracker in `docs/agents/setup.md`. Replaces the old `/orca-worker`. |
 | `/orca-plan` | Brainstorm a run with the user before any worker runs: grill the objective (design tree, rounds, recommendations), settle test seams and isolation per task, write `docs/agents/plan.md`, and get explicit approval. |
-| `/orca-tasks` | Turn an approved plan into an Orca Run and its Tasks with `--deps` edges (1:1, stable ids), plus the tracker issue mirror. Creates the namespace only — never launches a worker. |
+| `/orca-tasks` | Turn an approved plan into an Orca Run and its Tasks with `--deps` edges (1:1, stable ids), plus the tracker issue mirror the setup marker records. Creates the namespace only — never launches a worker. |
 | `/orca-orchestrate` | Coordinator runbook: bind the Run, sweep `task-list --ready`, dispatch one-task-one-branch to `worker` terminals, watchdog `check --wait`, gate failures, merge green task branches, release workers. Quick path for 1-2 task runs. |
 | `/orca-status` | Read-only status sweep: what needs a decision (pending gates, dispatches past budget, failed tasks), the task DAG, in-flight workers with elapsed vs budget, leaked terminals, peeked mail, and the pipeline docs. Changes nothing and consumes no mail. The shared sweep `/orca-resume` and `/orca-handoff` both run. |
 | `/orca-handoff` | Write a durable project handoff (Orca state + plan + session context) so a fresh orchestrator session resumes without losing context. |
@@ -91,7 +91,7 @@ pipeline above is the current overview until the diagram is regenerated.
    setup asks about the GitHub remote (create public/private, link an existing repo, or stay
    local-only) and about the tracker.
 2. `/orca-plan` — brainstorm and approve the plan.
-3. `/orca-tasks` — cut the Run + Tasks + tracker issue mirror.
+3. `/orca-tasks` — cut the Run + Tasks, then the tracker issue mirror the setup marker records.
 4. `/orca-orchestrate` — drive the run from the cockpit.
 5. `/orca-handoff` at the end of a session, then `/orca-resume` in the next one.
 
@@ -175,20 +175,19 @@ Claude Code's `/agents` wizard has been removed. The agents themselves still loa
   gate the coordinator opens it also closes: the DAG loop sweeps `gate-list --status pending`
   and `gate-resolve`s before dispatching more work.
 
-## Issue tracking: two exclusive trackers
+## Issue tracking
 
-The suite mirrors each task to exactly **one** tracker, chosen at setup: **GitHub** (`gh`) or
-**Linear** (`orca linear`). Never both — an empty GitHub issue list on a linear-tracker project
-is expected, not a bug.
+One token, recorded at setup. **The setup marker wins** — `/orca-tasks` follows it.
 
 | Tracker | Issue creation | Worktree link | After merge |
 | --- | --- | --- | --- |
 | `github` | `gh issue create` | `orca worktree set --issue <num>` | GitHub closes the issue automatically |
+| `github-pr` | follow-by-PR only | Orca DAG | PRs are the human-visible trail |
 | `linear` | `orca linear create` (workspace + team resolved at setup) | `orca worktree set --linear-issue <key>` | Linear does **not** move state — the coordinator sets the linked issue to Done explicitly |
 
-The worktree→issue link is what surfaces a task in Orca's **Tasks tab** under the chosen
-tracker. Linear is the only tracker with a native Orca CLI; GitHub creation goes through `gh`
-with a native worktree link.
+The worktree→issue link is what surfaces a task in Orca's **Tasks tab** under `github` and
+`linear`. Under `github-pr` the trail is the PRs. Linear is the only tracker with a native Orca
+CLI; GitHub issue creation goes through `gh` with a native worktree link.
 
 ## Tested end-to-end
 
