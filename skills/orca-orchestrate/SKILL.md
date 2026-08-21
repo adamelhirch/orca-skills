@@ -80,7 +80,8 @@ creates gates deadlocks the DAG by construction.
    worker in its own worktree — **one task = one branch = one worktree**, never the primary.
 
    **Pick the runtime, then create the worktree, launch the terminal, and bind the dispatch.** The
-   runtime is the coding agent that executes the task — `opencode`, `claude-code`, or `freebuff` —
+   runtime is the coding agent that executes the task — `opencode`, `claude-code`, `grok`, or
+   `freebuff` —
    and it is **independent of whichever agent you are orchestrating from**. Take the default from
    `docs/agents/setup.md` (`## Worker runtime`), overridden by the task's `runtime:` in the plan.
    **The exact launch command per runtime is in [`runtimes.md`](runtimes.md), next to this file.**

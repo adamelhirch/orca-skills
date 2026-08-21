@@ -98,17 +98,33 @@ per task in the plan. It is **independent of the orchestrator** — the orchestr
 whichever TUI you coordinate from, so a Claude Code cockpit can dispatch opencode workers and
 vice versa.
 
-| Runtime | Cost | Reports `worker_done` | Unattended |
-| --- | --- | --- | --- |
-| `opencode` | your provider key | itself | yes |
-| `claude-code` | Claude subscription/API | itself | yes |
-| `freebuff` | free (ad-funded) | **coordinator, impersonated** | no |
+| Runtime | Cost | Reports `worker_done` | Parallel | Unattended |
+| --- | --- | --- | --- | --- |
+| `opencode` | your provider key | itself | yes | yes |
+| `claude-code` | Claude subscription/API | itself | yes | yes |
+| `grok` | xAI account | itself | yes | yes |
+| `freebuff` | free (ad-funded) | **coordinator, impersonated** | **no** | no |
 
-The first two run the permissive `worker` profile installed by `/orca-setup` and follow the
+The first three run the permissive `worker` profile installed by `/orca-setup` and follow the
 shared contract. `freebuff` has no agent in the terminal at all: the coordinator types the
 prompt, polls for a completion marker, verifies the work itself, and signs the result — free, but
-it needs you present. Launch recipes for all three ship with `/orca-orchestrate` (its
+it needs you present, and only **one freebuff worker can run per machine** so its tasks are a
+queue rather than a fan-out. Launch recipes for all four ship with `/orca-orchestrate` (its
 `runtimes.md`); the freebuff loop is `/orca-freebuff`.
+
+### Agent profiles per host
+
+`/orca-setup` composes and installs the `worker` + `orchestrator` pair for every supported host:
+
+| Host | Agents directory | Launch a session as the worker |
+| --- | --- | --- |
+| opencode | `~/.config/opencode/agents/` | `OPENCODE_CONFIG_CONTENT='{"default_agent":"worker"}' opencode --auto` |
+| Claude Code | `~/.claude/agents/` | `claude --agent worker --permission-mode bypassPermissions` |
+| Grok | `~/.grok/agents/` | `grok --agent worker --always-approve` |
+
+Adding a host is one directory: drop `agents/<host>/{worker,orchestrator}.md` headers next to the
+shared contracts and teach `install-agents.sh` its destination. The validator discovers hosts from
+the directory listing and fails the build if the installer does not know one.
 
 ### Choosing agents in Claude Code
 

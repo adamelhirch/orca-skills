@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Install the Orca worker + orchestrator agent pairs for every host found on this machine.
+# Install the Orca worker + orchestrator agent pairs for every supported host (opencode, Claude
+# Code, Grok).
 #
 # Each installed agent is composed: a host header (frontmatter + host-specific permission notes)
 # followed by the shared behaviour contract. The contract lives in exactly one file per role, so
@@ -48,10 +49,21 @@ compose() {
   installed+=("$dest")
 }
 
+# host -> destination directory for agent definitions
+host_dest() {
+  case "$1" in
+    opencode) echo "$HOME/.config/opencode/agents" ;;
+    claude)   echo "$HOME/.claude/agents" ;;
+    grok)     echo "$HOME/.grok/agents" ;;
+    *)        return 1 ;;
+  esac
+}
+
 for role in worker orchestrator; do
   contract="$AGENTS/_shared/${role}-contract.md"
-  compose "$AGENTS/opencode/${role}.md" "$contract" "$HOME/.config/opencode/agents/${role}.md"
-  compose "$AGENTS/claude/${role}.md"   "$contract" "$HOME/.claude/agents/${role}.md"
+  for host in opencode claude grok; do
+    compose "$AGENTS/${host}/${role}.md" "$contract" "$(host_dest "$host")/${role}.md"
+  done
 done
 
 (( DRY_RUN )) && exit 0

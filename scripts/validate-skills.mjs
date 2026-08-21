@@ -107,13 +107,20 @@ const CONTRACT_HEADINGS = [
   "## Rules",
 ];
 
+// Hosts are discovered, not hardcoded: adding agents/<host>/ is all it should take to support a
+// new agent runtime, and the checks below must cover it automatically.
+const HOSTS = existsSync(join(ROOT, AGENTS))
+  ? readdirSync(join(ROOT, AGENTS)).filter((entry) => entry !== "_shared" && statSync(join(ROOT, AGENTS, entry)).isDirectory()).sort()
+  : [];
+if (HOSTS.length === 0) fail(AGENTS, "no host directories found — /orca-setup would install nothing");
+
 for (const role of ["worker", "orchestrator"]) {
   const contract = `${AGENTS}/_shared/${role}-contract.md`;
   if (!existsSync(join(ROOT, contract))) {
     fail(contract, `missing shared ${role} contract — installed agents would carry no behaviour rules`);
     continue;
   }
-  for (const host of ["claude", "opencode"]) {
+  for (const host of HOSTS) {
     const header = `${AGENTS}/${host}/${role}.md`;
     if (!existsSync(join(ROOT, header))) {
       fail(header, `missing ${host} host header for the ${role} agent`);
@@ -132,8 +139,13 @@ for (const role of ["worker", "orchestrator"]) {
 const installer = "skills/orca-setup/install-agents.sh";
 if (!existsSync(join(ROOT, installer))) {
   fail(installer, "missing agent composer — /orca-setup step 5 calls it");
-} else if (!(statSync(join(ROOT, installer)).mode & 0o111)) {
-  fail(installer, "agent composer is not executable");
+} else {
+  if (!(statSync(join(ROOT, installer)).mode & 0o111)) fail(installer, "agent composer is not executable");
+  // A host directory the installer does not know about ships headers that never reach a machine.
+  const script = read(installer);
+  for (const host of HOSTS) {
+    if (!script.includes(host)) fail(installer, `does not install the "${host}" host — agents/${host}/ would never be installed`);
+  }
 }
 
 // --- 5. skills are self-contained --------------------------------------------------------------

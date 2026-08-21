@@ -73,19 +73,20 @@ Pick the flow by the state of the target directory:
    `isMainWorktree` is `true`. If none is tagged, ask the user which worktree is primary.
    The primary worktree is the cockpit: it stays on the default branch, receives merged PRs,
    and is where the orchestrator coordinates from. Tasks never run in it.
-5. Install the agent pairs for this host (opencode + Claude Code) with the composer:
+5. Install the agent pairs for every supported host (opencode, Claude Code, Grok) with the
+   composer:
    ```bash
    <skill-dir>/install-agents.sh --dry-run   # show the four destinations
    <skill-dir>/install-agents.sh             # compose and install
    ```
-   Each installed agent is a **host header** (`agents/{opencode,claude}/<role>.md`: frontmatter +
+   Each installed agent is a **host header** (`agents/<host>/<role>.md`: frontmatter +
    host-specific permission notes) concatenated with the **shared behaviour contract**
    (`agents/_shared/<role>-contract.md`). The contract exists once per role, so a rule fixed once
    is fixed on every host. Never edit an installed agent in place and never copy the host headers
    by hand — a header without its contract is a worker with no lifecycle, TDD, or merge-gate
    rules at all.
 
-   The script exits non-zero and names the destination if any of the four cannot be written
+   The script exits non-zero and names the destination if any of them cannot be written
    (the known case is a `~/.claude/agents/` owned by another account). A half-installed pair
    stalls a run on the host that is missing it, so **setup is not complete until it exits 0.**
    If a target `agents` directory did not exist when the agent session started, restart that
@@ -135,6 +136,7 @@ Pick the flow by the state of the target directory:
      `worker_done`.
    - **`claude-code`** — the `worker` agent installed in `~/.claude/agents/`, reports its own
      `worker_done`.
+   - **`grok`** — the `worker` agent installed in `~/.grok/agents/`, reports its own `worker_done`.
    - **`freebuff`** — free and ad-funded, but there is **no agent in the terminal**: the
      coordinator types the prompt, polls for a completion marker, verifies the work itself, and
      signs the `worker_done` in the worker's name. It cannot run unattended. Only record it as
@@ -142,7 +144,7 @@ Pick the flow by the state of the target directory:
      per-task override.
 
    Confirm the chosen runtime is actually usable before recording it: the agent pair installed in
-   step 5 for `opencode`/`claude-code`, or `freebuff --version` plus a logged-in session for
+   step 5 for `opencode`/`claude-code`/`grok`, or `freebuff --version` plus a logged-in session for
    `freebuff`. The dispatch recipes for all three ship with `/orca-orchestrate` (its
    `runtimes.md`) — this step only records the choice.
 9. **Determine and record the merge gate.** "CI green" is meaningless until you know what runs
@@ -176,7 +178,7 @@ Pick the flow by the state of the target directory:
 
    ## Primary worktree   (selector / display name of the cockpit worktree)
    ## Repo               (remote or "local-only")
-   ## Worker runtime     (opencode | claude-code | freebuff — the default for this project)
+   ## Worker runtime     (opencode | claude-code | grok | freebuff — default for this project)
    ## Merge gate         (ci: github-actions | ci: local <command> | ci: unverified — verbatim)
    ## Conventions        (one-task-one-branch, TDD by default)
    ## Issue tracker      (github | linear — with workspace id + team key for linear)
