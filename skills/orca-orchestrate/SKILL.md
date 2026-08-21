@@ -123,8 +123,11 @@ creates gates deadlocks the DAG by construction.
    ```bash
    orca orchestration check --wait --types worker_done,escalation,question --timeout-ms 900000 --json
    ```
-   A timeout or `{count:0}` is a checkpoint, not a worker failure. Keep waiting until every
-   dispatch settles; workers routinely run 15-60 minutes.
+   `--types` decides *when* the waiter wakes; the Delivery is still the oldest full batch, so
+   heartbeats produce windows with nothing actionable — keep waiting. A timeout or `{count:0}`
+   is a checkpoint. Keep waiting until every dispatch settles; workers routinely run 15-60
+   minutes. Parse `--json` keepalives with a decoder loop; the versioned fact is the Orca
+   `check` row in `docs/COMPAT.md`.
 3. **On each `worker_done`**, settle it before acknowledging the Delivery:
    - `succeeded` → **check how it was verified before you merge.** Read `## Merge gate` in
      `docs/agents/setup.md` and confirm the report matches it: under `ci: github-actions` the PR
@@ -133,22 +136,25 @@ creates gates deadlocks the DAG by construction.
      command's result; under `ci: unverified` there is nothing to check and the merge is the
      user's accepted risk. A `succeeded` that does not name its evidence is not a pass — ask the
      worker (`orca orchestration reply`) or gate it, do not merge on trust.
-     Once the gate holds, **merge** the task branch, then clean up the task worktree, then
-     re-sweep:
+     Once the gate holds, **merge** the task branch, then clean up, then re-sweep. Release then
+     close is the nominal path for every `terminal create` worker (opencode, claude-code, grok):
+     `worker-release` returns `retained / external_terminal`, then
+     `orca terminal close --terminal <handle>`, then `orca worktree rm`. Orca closes only
+     terminals it created through `worker-start`.
       ```bash
       # github tracker: merge the PR (auto or via the user's review gate)
-      gh pr merge <pr_number> --squash --delete-branch
+      gh pr merge <pr_number> --squash
       # local-only (linear tracker, no remote): merge the branch into main in the cockpit
       #   git merge --squash <task-branch> && git push (if a remote exists)
       orca orchestration worker-release --dispatch <dispatch_id> --json
+      orca terminal close --terminal <handle> --json
       orca worktree rm --worktree <task_worktree_id> --force --json
+      git push origin --delete <branch>   # github tracker, after the worktree is gone
       # linear tracker: move the linked issue to Done explicitly — merge does not do it
       #   orca linear status set <issue_key> --to "Done" --workspace <workspace_id> --json
       ```
       Merging unblocks dependents: after cleanup, run `task-list --ready` again and dispatch
       what is newly ready. The worker merged nothing itself — the coordinator owns the merge.
-      An `external_terminal` worker stays live after `worker-release`: close it with
-      `orca terminal close --terminal <handle>` (see hard-won notes).
    - `failed` → **never redispatch silently.** Mark the task failed, block its dependents, and
      raise a decision gate to the user:
      ```bash
@@ -171,6 +177,10 @@ window times out, inspect each unsettled dispatch instead of waiting blindly:
 
 1. `orca orchestration worker-read --dispatch <id> --json` and
    `orca terminal wait --terminal <handle> --for tui-idle --timeout-ms 60000 --json`.
+   When `worker-read` returns `source: "terminal"` with `fallbackReason: session_not_reported`,
+   the message list is empty by construction — continue with
+   `orca terminal read --terminal <handle> --json`, and the grok TUI markers in `runtimes.md`
+   when the runtime is grok.
 2. If the worker is idle and its last message shows the work done (branch pushed, CI green, PR
    ready, final summary) but no `worker_done` arrived, re-inject the finalization from the
    worker's own terminal — the authority must come from there:
@@ -193,8 +203,9 @@ waits forever and the run looks healthy. Give each task a **time budget** (the p
 field, default 60 min) and climb one rung at a time:
 
 1. **Under budget** — keep waiting. Rolling `check --wait` windows; a timeout is a checkpoint.
-2. **Budget exceeded** — run the watchdog above (`worker-read` + `terminal wait --for tui-idle`).
-   If the work is visibly done, re-inject the finalization from the worker's own terminal.
+2. **Budget exceeded** — run the watchdog above (`worker-read`, then `terminal read` on
+   `session_not_reported`). If the work is visibly done, re-inject the finalization from the
+   worker's own terminal.
 3. **Still unsettled after the watchdog** — this is now a decision for the user, not a judgement
    call for you. Raise a gate with the evidence (last output, elapsed time, branch state):
    ```bash
@@ -226,8 +237,9 @@ terminals are still alive.
 - **The gate is whatever `docs/agents/setup.md` recorded** under `## Merge gate` — `github-actions`,
   `local <command>`, or `unverified`. Nothing red merges, and nothing *unverified* merges quietly:
   say which mode applied every time you merge. "CI green" is not a gate until you know a CI exists.
-- **github** tracker: squash-merge the PR (`gh pr merge --squash --delete-branch`) once the gate
-  holds.
+- **github** tracker: squash-merge the PR (`gh pr merge --squash`) once the gate holds. Delete
+  the remote branch (`git push origin --delete <branch>`) after `worktree rm` — git refuses
+  while the task worktree still holds the branch. The DAG loop settle block is the order.
 - **linear** tracker with no remote: merge the task branch into the cockpit `main` locally
   (`git merge --squash <task-branch>`), push if a remote exists.
 - The coordinator merges, the worker never does. The merge is what unblocks dependents, so
@@ -248,10 +260,6 @@ terminals are still alive.
   follow it with a manual `task-update` (except in recovery).
 - `worker-start` `--worktree new-child`/`new-top-level` creates a fresh worktree + branch and
   does not rerun setup. Do not reuse the primary worktree for tasks.
-- A worker launched through `terminal create` (custom argv / `OPENCODE_CONFIG_CONTENT`) is an
-  `external_terminal`: after `worker-release` returns `retained / external_terminal`, close the
-  worker terminal yourself (`orca terminal close --terminal <handle>`) — Orca does not close
-  terminals it did not create through `worker-start`.
 - Tracker updates after merge are **not automatic**: `gh pr merge` closes the GitHub issue on its
   own, but Linear does **not** move the issue state when the PR merges. After a successful
   linear-tracker merge, update the linked issue explicitly
