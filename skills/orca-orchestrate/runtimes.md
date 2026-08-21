@@ -14,7 +14,7 @@ you want to work in, and the runtime for the cost and capability the tasks need.
 | --- | --- | --- | --- | --- |
 | `opencode` | your provider key | `~/.config/opencode/agents/worker.md` | itself | the default; broad model choice |
 | `claude-code` | Claude subscription/API | `~/.claude/agents/worker.md` | itself | tasks wanting Claude Code's tooling |
-| `grok` | xAI account | `~/.grok/agents/worker.md` | itself | another supervised agent runtime; has a real headless mode |
+| `grok` | xAI account | `~/.grok/agents/worker.md` | itself | another supervised agent runtime; `-p` / `--prompt-file` is real headless, not this TUI path |
 | `freebuff` | free (ad-funded) | none — no agent in the terminal | **coordinator, impersonated** | throwaway tasks where free matters — **one at a time** |
 
 `opencode`, `claude-code`, and `grok` are *supervised agent* runtimes: they run the permissive
@@ -37,6 +37,7 @@ Both are detailed in `/orca-freebuff`.
 
 All three follow the same shape — **create the worktree, launch the terminal, then bind the
 dispatch** — and all three obey one task = one branch = one worktree, never the primary.
+Grok is the exception on availability: `terminal read` (its recipe), not `tui-idle`.
 
 ```bash
 orca worktree create --name <slug> --no-parent --setup run --json
@@ -75,21 +76,27 @@ Launch the terminal yourself and bind with `--terminal`.
 ### `grok`
 
 Grok selects the profile with `--agent` and uses the same `permission_mode: bypassPermissions` name
-as Claude Code. The profile already carries it; passing `--always-approve` is the safety net
-equivalent to opencode's `--auto`:
+as Claude Code. The profile already carries it; `--always-approve` is the safety net equivalent to
+opencode's `--auto`. Folder trust is a separate gate: first launch in a repo shows
+`Do you trust the contents of this directory?` and waits. `--always-approve` does not cover it.
+Trust is per git repo — later worktrees of the same repo skip the invite. Persist with `--trust`.
+If this binary rejects `--trust`, drop the flag, answer `y` on the invite, then bind.
 
 ```bash
 orca terminal create --worktree id:<wtId> --title <slug> \
-  --command "grok --agent worker --always-approve" --json
-orca terminal wait --terminal <handle> --for tui-idle --timeout-ms 60000 --json
+  --command "grok --agent worker --always-approve --trust" --json
+orca terminal read --terminal <handle> --json
+# ready when the status bar shows always-approve and the prompt is ❯
 orca orchestration worker-start --task <task_id> --terminal <handle> --worktree id:<wtId> --json
 ```
 
+This path is an `external_terminal`. `worker-read --source auto` returns `source: "terminal"` with
+`fallbackReason: session_not_reported` — not a hook-reported Grok transcript. Watch the terminal.
+
 Grok reads agent definitions from `~/.grok/agents/` (user) and `.grok/agents/` (project). It also
 discovers `~/.claude/agents/` — but as **subagents**, not as the session profile, so the Grok header
-in `~/.grok/agents/` is what `--agent worker` resolves. Grok additionally has a genuine headless
-mode (`-p "<prompt>"`, `--prompt-file`), unlike freebuff; the supervised pattern still uses a TUI
-terminal so the worker can send its own `worker_done` from where it runs.
+in `~/.grok/agents/` is what `--agent worker` resolves. `-p` / `--prompt-file` is real headless;
+the supervised TUI recipe does not use it, and `worker-read` does not return that output.
 
 ### `freebuff`
 
