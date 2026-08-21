@@ -21,6 +21,15 @@ an existing install does not self-heal, so skills added since last time are simp
 slash command does not exist), and skills retired from the repo linger as ghosts until removed
 by hand (`rm -rf ~/.claude/skills/<name>`). New skills appear after the agent restarts.
 
+Then run the installer once — it composes the agent pairs for every host **and** links the skills
+into opencode's directory, which `skills add` does not do:
+
+```bash
+skills/orca-setup/install-agents.sh          # --dry-run to preview
+```
+
+`/orca-setup` runs it for you; run it by hand after pulling repo updates.
+
 ## Pipeline
 
 ```
