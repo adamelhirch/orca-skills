@@ -34,12 +34,12 @@ orca skills get orchestration
    conventions in force) — they are part of the durable pipeline state.
 2. Reconcile it against live Orca state by running the **`/orca-status` sweep** — that skill owns
    the read-only reconstruction (cockpit, run + DAG, unsettled dispatches with elapsed vs budget,
-   pending gates, terminal accounting, peeked mail). Do not re-derive it here; a second hand-rolled
+   pending gates, terminal accounting, mail). Do not re-derive it here; a second hand-rolled
    copy of the sweep is how the two drift apart.
 
-   Note in particular: mail is read with `check --peek` (unread **without** marking read), never
-   `--unread` and never `--ack`. Consuming the mailbox while orienting loses a `worker_done` that
-   the coordinator still has to act on.
+   Take the sweep's Mail line as-is, including **unknown** when no Run is bound. Orientation
+   must not consume mail (`--unread` / `--ack`): that loses a `worker_done` the coordinator
+   still has to act on.
 
    Then flag every drift between the document and reality: a `worker_done` received since the
    handoff, a changed comment, a merged branch, a closed terminal, an advanced Run, a gate opened
