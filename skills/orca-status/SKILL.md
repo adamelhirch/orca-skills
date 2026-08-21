@@ -59,7 +59,7 @@ orca orchestration worker-list --terminal-state reclaimable --json
 orca terminal list --json
 orca orchestration dispatch-show --task <task_id> --json    # per unsettled task
 
-# 5. Mail, without consuming it
+# 5. Mail, without consuming it — after a bound Run (step 2), or pass `--run <id>`
 orca orchestration check --peek --json
 ```
 
@@ -87,6 +87,7 @@ Render one dashboard, ordered so the things needing a decision come first:
 ## Terminals               active / retained / reclaimable
                            (reclaimable = finished work still holding a terminal — a leak)
 ## Mail                    unread count by type, peeked not consumed
+                           (**unknown** when no Run is bound and `--run` was not passed)
 ## Cockpit                 worktree, branch, HEAD, card comment, isMainWorktree
 ## Pipeline docs           setup merge gate + tracker; plan status; handoff age
 ## Drift                   where the docs and live state disagree
@@ -110,7 +111,9 @@ Rules for the report:
 ## When there is no bound Run
 
 Say so plainly and report what still applies: the cockpit, the pipeline docs, any other runs from
-`run-list`, and leaked terminals. Never bind a Run to produce a nicer report — binding is a
+`run-list`, and leaked terminals. Mail is **unknown** (no Run bound) unless `--run <id>` was
+passed — then peek that Run. `check --peek` with neither still returns `{ok: true, count: 0}`,
+which is not a mailbox read. Never bind a Run to produce a nicer report — binding is a
 coordination act, and this skill does not coordinate.
 
 ## Done when
