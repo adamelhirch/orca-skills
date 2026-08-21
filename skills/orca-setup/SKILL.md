@@ -73,8 +73,7 @@ Pick the flow by the state of the target directory:
    `isMainWorktree` is `true`. If none is tagged, ask the user which worktree is primary.
    The primary worktree is the cockpit: it stays on the default branch, receives merged PRs,
    and is where the orchestrator coordinates from. Tasks never run in it.
-5. Install the agent pairs for every supported host (opencode, Claude Code, Grok) with the
-   composer:
+5. Make every supported host runnable (opencode, Claude Code, Grok) with the installer:
    ```bash
    <skill-dir>/install-agents.sh --dry-run   # show the four destinations
    <skill-dir>/install-agents.sh             # compose and install
@@ -86,11 +85,18 @@ Pick the flow by the state of the target directory:
    by hand — a header without its contract is a worker with no lifecycle, TDD, or merge-gate
    rules at all.
 
-   The script exits non-zero and names the destination if any of them cannot be written
-   (the known case is a `~/.claude/agents/` owned by another account). A half-installed pair
-   stalls a run on the host that is missing it, so **setup is not complete until it exits 0.**
-   If a target `agents` directory did not exist when the agent session started, restart that
-   agent once so the definitions are picked up.
+   It also **links this suite's skills into opencode's skills directory**. `skills add` installs
+   into the universal root (`~/.agents/skills`) and wires Claude Code and Grok up automatically,
+   but not opencode, which reads `~/.config/opencode/skills` — without the link an opencode session
+   has the agents but none of the `/orca-*` commands. The skill names come from the suite's own
+   directory, so one added or retired upstream needs no edit here. On a machine without opencode
+   the step is skipped rather than demanded.
+
+   The script exits non-zero and names what failed: an agent destination that cannot be written
+   (the known case is a `~/.claude/agents/` owned by another account), or skills that are not
+   installed yet — it prints the `skills add` command to fix that. A half-installed host stalls a
+   run, so **setup is not complete until it exits 0.** Restart any agent session that was already
+   running: agents and skills are read at startup.
 6. Verify both layers of skills are present on this host:
    - **The Orca binary guides** (the skills load their command surface from the binary, never
      from this repo): `orca skills get orchestration` and `orca skills get orca-cli` must both
