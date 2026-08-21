@@ -6,7 +6,7 @@ description: >-
   worker + orchestrator agent pairs (opencode and Claude Code), resolve the merge
   gate that defines what "verified" means here (github-actions, a local test
   command, or an explicitly accepted unverified project), and record the per-repo
-  conventions plus the issue tracker (github via gh, or linear via orca linear —
+  conventions plus the issue tracker (github, github-pr, or linear via orca linear —
   always resolving the workspace). Two flows: a new empty project and an existing repo.
   Orchestrator sessions only. Invoke with /orca-setup.
 disable-model-invocation: true
@@ -68,7 +68,8 @@ Pick the flow by the state of the target directory:
      Push the current branch and re-run `git remote -v` to confirm.
    - **Link an existing GitHub repo** — `git remote add origin <url>` then `git push -u origin main`.
    - **Keep local-only** — no remote; record that choice.
-   Never silently create a repo, and never assume `github` tracking without a remote.
+   Never silently create a repo, and never assume `github` or `github-pr` tracking without a
+   remote.
 4. Detect the primary worktree: `orca worktree list --json` and take the worktree whose
    `isMainWorktree` is `true`. If none is tagged, ask the user which worktree is primary.
    The primary worktree is the cockpit: it stays on the default branch, receives merged PRs,
@@ -115,15 +116,16 @@ Pick the flow by the state of the target directory:
      not self-heal**: skills added since the last install are simply absent, and skills deleted
      from the repo (e.g. the retired `orca-worker`) stay behind as ghosts until removed by hand
      (`rm -rf ~/.claude/skills/<name>`). New skills only appear after the agent restarts.
-7. **Record the issue tracker.** Ask the user which tracker to use. The two supported trackers
-   are **github** (via `gh`) and **linear** (via the native `orca linear` CLI). There is no
-   markdown tracker and no "none" choice — issue tracking lives in the tracker itself. Record
-   the choice directly in the setup marker (no separate config file):
-   - **github** — requires a GitHub remote (set in step 3). `/orca-tasks` mirrors each task as a
-     `gh issue` and links the task worktree (`orca worktree set --worktree <sel> --issue <num>`),
-     which surfaces it in Orca's Tasks tab under GitHub.
-   - **linear** — mandatory workspace resolution. Orca never creates a Linear workspace; it only
-     works on workspaces already connected in Orca settings. Run
+7. **Record the issue tracker.** Ask the user which tracker to use. Record the chosen token
+   verbatim under `## Issue tracker` in the setup marker (no separate config file). The three
+   tokens:
+   - **github** — issues + PRs. Requires a GitHub remote (set in step 3). `/orca-tasks` mirrors
+     each task as a `gh issue` and links the task worktree (`orca worktree set --worktree <sel>
+     --issue <num>`), which surfaces it in Orca's Tasks tab under GitHub.
+   - **github-pr** — GitHub follow-by-PR only. Requires a GitHub remote (set in step 3). The
+     Orca DAG is the source of truth for dependencies; PRs are the human-visible trail.
+   - **linear** — Linear issues. Mandatory workspace resolution. Orca never creates a Linear
+     workspace; it only works on workspaces already connected in Orca settings. Run
      `orca linear team list --workspace all --json` and present the returned list (each team
      shows its `key`, `name`, and `workspace.id`). Ask the user which workspace (and which team
      key) issues should mirror to. Do **not** proceed past setup with Linear chosen but no
@@ -132,9 +134,10 @@ Pick the flow by the state of the target directory:
      (`orca worktree set --worktree <sel> --linear-issue <key>`) so the tracking shows up in
      Orca's Tasks tab under Linear.
 
-   **The two trackers are exclusive.** One project mirrors to exactly one tracker — `github` or
-   `linear`, never both. With `github`, only `gh` issues are created; with `linear`, only Linear
-   issues. An empty GitHub issue list on a linear-tracker project is expected, not a bug.
+   One token per project. There is no markdown tracker — `github-pr` is the recorded
+   GitHub-PRs-only choice. **The setup marker wins.** `/orca-tasks` follows the recorded token;
+   it does not override a `github-pr` marker by creating issues because the skill's default is
+   `github`. An empty GitHub issue list under `linear` or `github-pr` is the recorded choice.
 8. **Choose the worker runtime.** This is *what runs the tasks*, and it is **independent of the
    orchestrator** — the orchestrator is simply whichever TUI you coordinate from. Ask the user
    which runtime the workers should use by default; the plan can override it per task:
@@ -187,7 +190,7 @@ Pick the flow by the state of the target directory:
    ## Worker runtime     (opencode | claude-code | grok | freebuff — default for this project)
    ## Merge gate         (ci: github-actions | ci: local <command> | ci: unverified — verbatim)
    ## Conventions        (one-task-one-branch, TDD by default)
-   ## Issue tracker      (github | linear — with workspace id + team key for linear)
+   ## Issue tracker      (github | github-pr | linear — with workspace id + team key for linear)
    ## Agents installed   (worker + orchestrator for opencode and Claude Code)
    ## Guides             (orca orchestration + orca-cli present in the binary)
    ## Status             (setup complete | skipped — <reason>)
@@ -201,8 +204,8 @@ The Tasks tab is the **issue-tracker view** — it shows GitHub issues and Linea
 a task shows up there **only if its worktree is linked to an issue** (`--issue` / `--linear-issue`).
 Orchestration tasks (`orca orchestration task-*`) are coordination state — the DAG, dispatch
 statuses, and gates — visible in the orchestration context and the worktree card, **not** in the
-Tasks tab. `/orca-tasks` always sets the worktree link after creating a mirror issue, so every
-task appears in the Tasks tab under the chosen tracker.
+Tasks tab. `/orca-tasks` sets the worktree link after creating a mirror issue for `github` and
+`linear`. Under `github-pr` the trail is the PRs; the DAG stays visible as orchestration state.
 
 ## Done when
 
@@ -218,8 +221,9 @@ task appears in the Tasks tab under the chosen tracker.
   every pipeline skill is installed for this host (no missing skill, no ghost of a retired one).
 - The **worker runtime** default is recorded and confirmed usable, chosen independently of
   whichever agent the orchestrator is running in.
-- The tracker is recorded in `docs/agents/setup.md`: **github** with a confirmed remote, or
-  **linear** with a concrete `workspace` id + `team` key chosen by the user from
+- The tracker token is recorded verbatim in `docs/agents/setup.md` under `## Issue tracker`:
+  **github** with a confirmed remote, **github-pr** with a confirmed remote, or **linear** with
+  a concrete `workspace` id + `team` key chosen by the user from
   `orca linear team list --workspace all`. Setup is not complete otherwise.
 - The card comment points at `docs/agents/setup.md`.
 
