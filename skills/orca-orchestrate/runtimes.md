@@ -15,11 +15,12 @@ you want to work in, and the runtime for the cost and capability the tasks need.
 | `opencode` | your provider key | `~/.config/opencode/agents/worker.md` | itself | the default; broad model choice |
 | `claude-code` | Claude subscription/API | `~/.claude/agents/worker.md` | itself | tasks wanting Claude Code's tooling |
 | `grok` | xAI account | `~/.grok/agents/worker.md` | itself | another supervised agent runtime; `-p` / `--prompt-file` is real headless, not this TUI path |
+| `hermes` | your Hermes provider key (e.g. ox-alpha via opencode-go) | profile `orca-worker` / skill in `~/.hermes/skills/` | itself | another supervised agent runtime; persistent memory/skills ecosystem |
 | `freebuff` | free (ad-funded) | none — no agent in the terminal | **coordinator, impersonated** | throwaway tasks where free matters — **one at a time** |
 
-`opencode`, `claude-code`, and `grok` are *supervised agent* runtimes: they run the permissive
-`worker` profile installed by `/orca-setup`, follow the shared contract, and send their own
-`worker_done`.
+`opencode`, `claude-code`, `grok`, and `hermes` are *supervised agent* runtimes: they run the
+permissive `worker` profile installed by `/orca-setup`, follow the shared contract, and send their
+own `worker_done`.
 `freebuff` is a *driven TUI* runtime: there is no agent, the coordinator types into it and signs
 the result. That difference is the whole reason to prefer the first two by default.
 
@@ -35,8 +36,8 @@ Both are detailed in `/orca-freebuff`.
 
 ## Dispatch recipes
 
-All three follow the same shape — **create the worktree, launch the terminal, then bind the
-dispatch** — and all three obey one task = one branch = one worktree, never the primary.
+All supervised runtimes follow the same shape — **create the worktree, launch the terminal, then
+bind the dispatch** — and all of them obey one task = one branch = one worktree, never the primary.
 Grok is the exception on availability: `terminal read` (its recipe), not `tui-idle`.
 
 ```bash
@@ -97,6 +98,50 @@ Grok reads agent definitions from `~/.grok/agents/` (user) and `.grok/agents/` (
 discovers `~/.claude/agents/` — but as **subagents**, not as the session profile, so the Grok header
 in `~/.grok/agents/` is what `--agent worker` resolves. `-p` / `--prompt-file` is real headless;
 the supervised TUI recipe does not use it, and `worker-read` does not return that output.
+
+### `hermes`
+
+Hermes has no agent directory and no agent-select flag, so the permissive profile reaches a
+session one of two ways, both installed by `/orca-setup`:
+
+- **Profiles (preferred).** `/orca-setup` creates the Hermes profiles `orca-worker` /
+  `orca-orchestrator` (`--clone` of your default config), ships `approvals.mode: off` in each,
+  and composes header + shared contract into their `SOUL.md` — every session on the profile IS
+  the role, no flags needed. The wrapper aliases make them plain commands:
+- **Skills.** The same composition installs as skills `orca-worker` / `orca-orchestrator` in
+  `~/.hermes/skills/`, preloaded at launch with `--skills`; add `--yolo` yourself in this path
+  (it is Hermes' approval bypass, the opencode `--auto` equivalent — without it an unattended
+  dispatch stalls on dangerous-command approvals).
+
+```bash
+orca terminal create --worktree id:<wtId> --title <slug> \
+  --command "orca-worker chat" --json
+# skill path instead of the profile:
+#   --command "hermes chat --skills orca-worker --yolo"
+orca terminal wait --terminal <handle> --for tui-idle --timeout-ms 60000 --json
+orca terminal read --terminal <handle> --json
+# ready ONLY when the screen shows the banner line `Profile: orca-worker` and the `❯` prompt.
+# tui-idle is NOT sufficient for hermes: measured firing satisfied:true while the screen still
+# showed the bare shell (same trap as grok). Cold start of a fresh profile is 2-4 minutes
+# (first-run tirith install + MCP servers) — do not declare the worker dead inside that window;
+# later launches on a warmed profile are far faster.
+orca orchestration worker-start --task <task_id> --terminal <handle> --worktree id:<wtId> --json
+```
+
+Like every supervised recipe this is an `external_terminal`, so expect `worker-read --source auto`
+to fall back to `source: "terminal"` until Orca proves Hermes sessions — no transcript claim is
+made here. Exercised end-to-end once (2026-08-22, Hermes v0.20.5, Orca `1.4.x`): dispatch → the
+worker read its injected preamble → executed the task → sent its own `worker_done`
+(`outcome: succeeded`, correct task/dispatch ids) in 1m44s; the coordinator verified the artifact
+independently. Watch the terminal for anything longer than that.
+
+The cockpit works the same way: coordinate from `orca-orchestrator chat` (or `hermes chat
+--skills orca-orchestrator --yolo`). The `/orca-*` skills are symlinked into `~/.hermes/skills/`
+by `/orca-setup`, and AGENTS.md in the worktree is auto-loaded. Model/provider come from the
+cloned config (`model.default`, e.g. ox-alpha via opencode-go); pass `-m/--provider` only when
+the plan names a specific one. Verified on Hermes Agent v0.20.5: `--profile/-p` is a global flag
+(works before or after the subcommand), `chat -q` is headless, `--skills` preloads, and there is
+no per-session agent directory — do not invent an `--agent` flag.
 
 ### `freebuff`
 

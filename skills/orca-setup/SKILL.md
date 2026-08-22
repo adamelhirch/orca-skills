@@ -3,9 +3,9 @@ name: orca-setup
 description: >-
   Hook a project up to Orca supervised orchestration: register the repo (creating
   or linking a GitHub repo when none exists, asking public/private), install the
-  worker + orchestrator agent pairs (opencode and Claude Code), resolve the merge
-  gate that defines what "verified" means here (github-actions, a local test
-  command, or an explicitly accepted unverified project), and record the per-repo
+  worker + orchestrator agent pairs (opencode, Claude Code, Grok, Hermes), resolve
+  the merge gate that defines what "verified" means here (github-actions, a local
+  test command, or an explicitly accepted unverified project), and record the per-repo
   conventions plus the issue tracker (github, github-pr, or linear via orca linear —
   always resolving the workspace). Two flows: a new empty project and an existing repo.
   Orchestrator sessions only. Invoke with /orca-setup.
@@ -74,9 +74,9 @@ Pick the flow by the state of the target directory:
    `isMainWorktree` is `true`. If none is tagged, ask the user which worktree is primary.
    The primary worktree is the cockpit: it stays on the default branch, receives merged PRs,
    and is where the orchestrator coordinates from. Tasks never run in it.
-5. Make every supported host runnable (opencode, Claude Code, Grok) with the installer:
+5. Make every supported host runnable (opencode, Claude Code, Grok, Hermes) with the installer:
    ```bash
-   <skill-dir>/install-agents.sh --dry-run   # show the four destinations
+   <skill-dir>/install-agents.sh --dry-run   # show the eight destinations
    <skill-dir>/install-agents.sh             # compose and install
    ```
    Each installed agent is a **host header** (`agents/<host>/<role>.md`: frontmatter +
@@ -86,12 +86,23 @@ Pick the flow by the state of the target directory:
    by hand — a header without its contract is a worker with no lifecycle, TDD, or merge-gate
    rules at all.
 
-   It also **links this suite's skills into opencode's skills directory**. `skills add` installs
+   On Hermes there is no agents directory: the composed pair lands two ways. First, in
+   `~/.hermes/skills/` as the skills `orca-worker` / `orca-orchestrator` (one SKILL.md each,
+   selected at launch with `--skills`). Second — preferred — as real Hermes **profiles** of the
+   same names: create each with `hermes profile create <name> --clone`, set
+   `approvals.mode: off` on it (`hermes -p <name> config set approvals.mode off`), and compose
+   the header (frontmatter stripped) + shared contract into its `SOUL.md`. The profile carries
+   the role permanently — every session on it IS the worker/cockpit, no flags needed — and the
+   wrapper alias (`~/.local/bin/<name>`) makes it a plain command (`orca-worker chat`).
+
+   It also **links this suite's skills into the hosts whose skills directory is not the universal
+   root** — opencode (`~/.config/opencode/skills`) and Hermes (`~/.hermes/skills`). `skills add`
+   installs
    into the universal root (`~/.agents/skills`) and wires Claude Code and Grok up automatically,
-   but not opencode, which reads `~/.config/opencode/skills` — without the link an opencode session
-   has the agents but none of the `/orca-*` commands. The skill names come from the suite's own
-   directory, so one added or retired upstream needs no edit here. On a machine without opencode
-   the step is skipped rather than demanded.
+   but not those two — without the link such a host has the agents but none of the `/orca-*`
+   commands. The skill names come from the suite's own directory, so one added or retired upstream
+   needs no edit here. On a machine without a given host, its links are skipped rather than
+   demanded.
 
    The script exits non-zero and names what failed: an agent destination that cannot be written
    (the known case is a `~/.claude/agents/` owned by another account), or skills that are not
@@ -146,6 +157,8 @@ Pick the flow by the state of the target directory:
    - **`claude-code`** — the `worker` agent installed in `~/.claude/agents/`, reports its own
      `worker_done`.
    - **`grok`** — the `worker` agent installed in `~/.grok/agents/`, reports its own `worker_done`.
+   - **`hermes`** — the `orca-worker` Hermes profile (or the `orca-worker` skill preloaded with
+     `--skills`), reports its own `worker_done`.
    - **`freebuff`** — free and ad-funded, but there is **no agent in the terminal**: the
      coordinator types the prompt, polls for a completion marker, verifies the work itself, and
      signs the `worker_done` in the worker's name. It cannot run unattended. Only record it as
@@ -153,9 +166,9 @@ Pick the flow by the state of the target directory:
      per-task override.
 
    Confirm the chosen runtime is actually usable before recording it: the agent pair installed in
-   step 5 for `opencode`/`claude-code`/`grok`, or `freebuff --version` plus a logged-in session for
-   `freebuff`. The dispatch recipes for all three ship with `/orca-orchestrate` (its
-   `runtimes.md`) — this step only records the choice.
+   step 5 for `opencode`/`claude-code`/`grok`/`hermes`, or `freebuff --version` plus a logged-in
+   session for `freebuff`. The dispatch recipes ship with `/orca-orchestrate` (its `runtimes.md`) —
+   this step only records the choice.
 9. **Determine and record the merge gate.** "CI green" is meaningless until you know what runs
    here — and it degrades silently: `gh pr checks` prints `no checks reported` and **exits 0** on
    a repo with no workflows, so a worker that trusts the exit code reports success having run
@@ -187,7 +200,7 @@ Pick the flow by the state of the target directory:
 
    ## Primary worktree   (selector / display name of the cockpit worktree)
    ## Repo               (remote or "local-only")
-   ## Worker runtime     (opencode | claude-code | grok | freebuff — default for this project)
+   ## Worker runtime     (opencode | claude-code | grok | hermes | freebuff — default for this project)
    ## Merge gate         (ci: github-actions | ci: local <command> | ci: unverified — verbatim)
    ## Conventions        (one-task-one-branch, TDD by default)
    ## Issue tracker      (github | github-pr | linear — with workspace id + team key for linear)
@@ -211,8 +224,8 @@ Tasks tab. `/orca-tasks` sets the worktree link after creating a mirror issue fo
 
 - The repo is registered in Orca; the primary worktree is identified; a GitHub remote exists
   or "local-only" was explicitly recorded.
-- Both agent pairs (`worker` + `orchestrator`) are installed for opencode and Claude Code —
-  `install-agents.sh` exited 0, so all four destinations are composed, not just some.
+- Both agent pairs (`worker` + `orchestrator`) are installed for opencode, Claude Code, Grok, and
+  Hermes — `install-agents.sh` exited 0, so all eight destinations are composed, not just some.
 - The **merge gate** is recorded verbatim in `docs/agents/setup.md`: `github-actions` (workflows
   confirmed present), `local <command>` (command run once and confirmed), or `unverified`
   (explicitly accepted by the user, with the reason). A project whose gate is unrecorded cannot

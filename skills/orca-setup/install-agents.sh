@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# Make every supported host (opencode, Claude Code, Grok) able to run Orca orchestration:
+# Make every supported host (opencode, Claude Code, Grok, Hermes) able to run Orca orchestration:
 #
 #   1. Install the worker + orchestrator agent pairs. Each is composed from a host header
 #      (frontmatter + host-specific permission notes) plus the shared behaviour contract. The
 #      contract lives in exactly one file per role, so a rule fixed once is fixed for every host —
 #      the previous copy-per-host layout drifted silently.
-#   2. Link this suite's skills into opencode's skills directory. `skills add` installs into the
-#      universal root (~/.agents/skills) and symlinks it for Claude Code and Grok automatically,
-#      but not for opencode, which reads ~/.config/opencode/skills. Without the link, an opencode
-#      session has the agents but none of the /orca-* commands.
+#   2. Link this suite's skills into the hosts whose skills directory is NOT the universal root.
+#      `skills add` installs into the universal root (~/.agents/skills) and symlinks it for Claude
+#      Code and Grok automatically, but opencode reads ~/.config/opencode/skills and Hermes reads
+#      ~/.hermes/skills. Without the link, such a host has the agents but none of the /orca-*
+#      commands.
 #
 # Usage: skills/orca-setup/install-agents.sh [--dry-run]
 
@@ -19,6 +20,7 @@ AGENTS="$HERE/agents"
 # Where `skills add` puts installed skills. Override for a non-standard install root.
 SKILLS_ROOT="${ORCA_SKILLS_ROOT:-$HOME/.agents/skills}"
 OPENCODE_SKILLS="$HOME/.config/opencode/skills"
+HERMES_SKILLS="$HOME/.hermes/skills"
 DRY_RUN=0
 [[ "${1:-}" == "--dry-run" ]] && DRY_RUN=1
 
@@ -26,7 +28,7 @@ installed=()
 skipped=()
 linked=()
 missing_skills=()
-opencode_absent=0
+absent_hosts=()
 
 # compose <host-header> <shared-contract> <destination>
 compose() {
@@ -65,73 +67,148 @@ host_dest() {
     opencode) echo "$HOME/.config/opencode/agents" ;;
     claude)   echo "$HOME/.claude/agents" ;;
     grok)     echo "$HOME/.grok/agents" ;;
+    # Hermes has no per-session agent directory: the pair installs as the skills
+    # orca-worker / orca-orchestrator, selected at launch with `hermes --skills <name>`.
+    hermes)   echo "$HERMES_SKILLS" ;;
     *)        return 1 ;;
+  esac
+}
+
+# host role -> destination file. Hermes addresses a profile by skill name, so each role lands in
+# its own skill directory with a SKILL.md; every other host keeps one flat file per role.
+agent_file() {
+  local host="$1" role="$2"
+  case "$host" in
+    hermes) echo "$(host_dest "$host")/orca-${role}/SKILL.md" ;;
+    *)      echo "$(host_dest "$host")/${role}.md" ;;
   esac
 }
 
 for role in worker orchestrator; do
   contract="$AGENTS/_shared/${role}-contract.md"
-  for host in opencode claude grok; do
-    compose "$AGENTS/${host}/${role}.md" "$contract" "$(host_dest "$host")/${role}.md"
+  for host in opencode claude grok hermes; do
+    compose "$AGENTS/${host}/${role}.md" "$contract" "$(agent_file "$host" "$role")"
   done
 done
 
-# Link this suite's skills into opencode's skills directory.
+# Compose the pair onto Hermes profiles' SOUL.md (permanent identity slot).
+#
+# Only profiles in the suite's `orca-` namespace are touched — never a user's personal profile.
+# A profile named orca-worker/orca-orchestrator IS the role: its SOUL.md carries the same
+# header + shared contract composition as the installed skills, so the rules hold no matter how
+# the session was launched (`orca-worker chat`, `hermes -p orca-worker …`, `--skills`, TUI).
+compose_hermes_profiles() {
+  local profiles_dir="$HOME/.hermes/profiles"
+  # SOUL.md is an identity file, not a skill: strip the header's frontmatter block (--- … ---).
+  body_of() { awk 'NR==1&&/^---[[:space:]]*$/{fm=1;next} fm&&/^---[[:space:]]*$/{fm=0;next} fm{next} {print}' "$1"; }
+  for role in worker orchestrator; do
+    local profile="orca-${role}"
+    local dir="$profiles_dir/$profile"
+    if [[ ! -d "$dir" ]]; then
+      # Create the profile when the machine has hermes and it does not exist yet. The wrapper
+      # (~/.local/bin/<profile>) makes the role launchable as a plain command.
+      if (( DRY_RUN )); then
+        echo "would create hermes profile $profile (--clone, wrapper alias)"
+        continue
+      fi
+      if ! command -v hermes >/dev/null 2>&1; then
+        skipped+=("hermes profile $profile (hermes CLI not found)")
+        continue
+      fi
+      if ! hermes profile create "$profile" --clone >/dev/null 2>&1 \
+        && ! hermes profile list 2>/dev/null | grep -q "^$profile"; then
+        skipped+=("hermes profile $profile (creation failed — run 'hermes profile create $profile --clone' by hand)")
+        continue
+      fi
+      # The role runs unattended: kill approval prompts at the profile level (the --yolo
+      # equivalent, shipped in the profile's own config).
+      hermes -p "$profile" config set approvals.mode off >/dev/null 2>&1 || true
+    fi
+    local dest="$dir/SOUL.md"
+    if (( DRY_RUN )); then
+      echo "would compose $dest"
+      continue
+    fi
+    if ! { body_of "$AGENTS/hermes/${role}.md"; echo; cat "$AGENTS/_shared/${role}-contract.md"; } > "$dest" 2>/dev/null; then
+      skipped+=("$dest (not writable — check ownership of $dir)")
+      continue
+    fi
+    installed+=("$dest")
+  done
+}
+
+compose_hermes_profiles
+
+# Link this suite's skills into a host whose skills directory is not wired to SKILLS_ROOT.
 #
 # The skill names come from this repo's skills/ directory — the parent of this script — so a skill
 # added or retired upstream is picked up without editing a list here. A name that is not present in
 # SKILLS_ROOT is reported, not linked: it means `skills add` has not run (or ran before that skill
 # existed), and a dangling symlink would be worse than an honest gap.
-link_opencode_skills() {
-  local suite_dir="$(dirname "$HERE")"
+link_host_skills() {
+  local link_dir="$1" host="$2"
+  local suite_dir
+  suite_dir="$(dirname "$HERE")"
 
-  # Nothing to do on a machine without opencode — do not demand skills for a host that is absent.
-  if ! command -v opencode >/dev/null 2>&1 && [[ ! -d "$HOME/.config/opencode" ]]; then
-    opencode_absent=1
-    return
-  fi
+  # Nothing to do on a machine without the host — do not demand skills for an absent runtime.
+  case "$host" in
+    opencode)
+      if ! command -v opencode >/dev/null 2>&1 && [[ ! -d "$HOME/.config/opencode" ]]; then
+        absent_hosts+=("$host")
+        return
+      fi
+      ;;
+    hermes)
+      if ! command -v hermes >/dev/null 2>&1 && [[ ! -d "$HOME/.hermes" ]]; then
+        absent_hosts+=("$host")
+        return
+      fi
+      ;;
+  esac
 
   if [[ ! -d "$SKILLS_ROOT" ]]; then
-    missing_skills+=("$SKILLS_ROOT does not exist — no skills are installed yet")
+    missing_skills+=("$SKILLS_ROOT does not exist — no skills are installed yet (needed by $host)")
     return
   fi
 
   for skill_path in "$suite_dir"/*/; do
-    local skill="$(basename "$skill_path")"
+    local skill
+    skill="$(basename "$skill_path")"
     [[ -f "$skill_path/SKILL.md" ]] || continue
 
     if [[ ! -e "$SKILLS_ROOT/$skill" ]]; then
-      missing_skills+=("$skill (not in $SKILLS_ROOT)")
+      missing_skills+=("$skill (not in $SKILLS_ROOT — needed by $host)")
       continue
     fi
 
     if (( DRY_RUN )); then
-      echo "would link $OPENCODE_SKILLS/$skill"
+      echo "would link $link_dir/$skill"
       continue
     fi
 
-    if ! mkdir -p "$OPENCODE_SKILLS" 2>/dev/null; then
-      skipped+=("$OPENCODE_SKILLS/$skill (cannot create $OPENCODE_SKILLS)")
+    if ! mkdir -p "$link_dir" 2>/dev/null; then
+      skipped+=("$link_dir/$skill (cannot create $link_dir)")
       return
     fi
-    if ln -sfn "$SKILLS_ROOT/$skill" "$OPENCODE_SKILLS/$skill" 2>/dev/null; then
-      linked+=("$OPENCODE_SKILLS/$skill")
+    if ln -sfn "$SKILLS_ROOT/$skill" "$link_dir/$skill" 2>/dev/null; then
+      linked+=("$link_dir/$skill")
     else
-      skipped+=("$OPENCODE_SKILLS/$skill (symlink failed)")
+      skipped+=("$link_dir/$skill (symlink failed)")
     fi
   done
 }
 
-link_opencode_skills
+link_host_skills "$OPENCODE_SKILLS" opencode
+link_host_skills "$HERMES_SKILLS" hermes
 
 # Reported in dry-run too: a preview that hides what it cannot do is worse than no preview.
 report_missing_skills() {
   (( ${#missing_skills[@]} )) || return 0
   echo >&2
-  echo "Skills not linked for opencode:" >&2
+  echo "Skills not linked for the hosts that need explicit links:" >&2
   for entry in "${missing_skills[@]}"; do echo "  $entry" >&2; done
   echo >&2
-  echo "opencode would have the agents but none of the /orca-* commands. Install them, then" >&2
+  echo "Those hosts would have the agents but none of the /orca-* commands. Install them, then" >&2
   echo "re-run this script:" >&2
   echo "  cd ~ && npx -y skills add adamelhirch/orca-skills --global --skill '*' -y" >&2
   echo >&2
@@ -140,14 +217,16 @@ report_missing_skills() {
 }
 
 if (( DRY_RUN )); then
-  (( opencode_absent )) && echo "opencode not found — its skill links would be skipped"
+  (( ${#absent_hosts[@]} )) && echo "skill links would be skipped (no ${absent_hosts[*]} install found)"
   report_missing_skills
   exit 0
 fi
 
 for path in "${installed[@]}"; do echo "installed $path"; done
 for path in "${linked[@]}"; do echo "linked    $path"; done
-(( opencode_absent )) && echo "skipped opencode skill links (opencode not installed on this host)"
+if (( ${#absent_hosts[@]} )); then
+  echo "skipped skill links for ${absent_hosts[*]} (host not installed on this machine)"
+fi
 if (( ${#skipped[@]} )); then
   echo
   echo "NOT installed:" >&2

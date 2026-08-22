@@ -3,7 +3,7 @@
 Skills for orchestrating multi-agent work on [Orca](https://orca.sh): project setup, plan-first
 brainstorm, plan-to-task cutting, the coordinator DAG runbook, durable project handoff/resume,
 and the supervised worker + orchestrator agents. Built for **orchestrator sessions** (the
-persistent cockpit worktree), usable from opencode and Claude Code.
+persistent cockpit worktree), usable from opencode, Claude Code, Grok, and Hermes.
 
 The suite was validated end-to-end in real runs: a Linear-tracked project and a GitHub-tracked
 project each went setup → plan → tasks → orchestrate → merge with green tests, linked issues,
@@ -22,7 +22,7 @@ slash command does not exist), and skills retired from the repo linger as ghosts
 by hand (`rm -rf ~/.claude/skills/<name>`). New skills appear after the agent restarts.
 
 Then run the installer once — it composes the agent pairs for every host **and** links the skills
-into opencode's directory, which `skills add` does not do:
+into the directories of the hosts that need it (opencode and Hermes), which `skills add` does not do:
 
 ```bash
 skills/orca-setup/install-agents.sh          # --dry-run to preview
@@ -79,8 +79,11 @@ pipeline above is the current overview until the diagram is regenerated.
 - For Linear tracking, a Linear workspace connected in Orca settings + the native `orca linear`
   CLI. For GitHub tracking, an authenticated `gh` CLI and a remote.
 - `/orca-setup` installs the agent pairs via `skills/orca-setup/install-agents.sh`: opencode
-  `~/.config/opencode/agents/{worker,orchestrator}.md` and Claude Code
-  `~/.claude/agents/{worker,orchestrator}.md`. Each is composed from a host header
+  `~/.config/opencode/agents/{worker,orchestrator}.md`, Claude Code
+  `~/.claude/agents/{worker,orchestrator}.md`, Grok `~/.grok/agents/{worker,orchestrator}.md`,
+  and Hermes `~/.hermes/skills/{orca-worker,orca-orchestrator}/SKILL.md` (Hermes has no agent
+  directory — its pair installs as skills selected at launch with `--skills`). Each is composed
+  from a host header
   (`agents/<host>/<role>.md`, frontmatter + host permissions) plus the shared behaviour contract
   (`agents/_shared/<role>-contract.md`) — the lifecycle, TDD, and merge-gate rules exist once per
   role, not once per host.
@@ -112,13 +115,14 @@ vice versa.
 | `opencode` | your provider key | itself | yes | yes |
 | `claude-code` | Claude subscription/API | itself | yes | yes |
 | `grok` | xAI account | itself | yes | yes |
+| `hermes` | your Hermes provider key (e.g. ox-alpha via opencode-go) | itself | yes | yes |
 | `freebuff` | free (ad-funded) | **coordinator, impersonated** | **no** | no |
 
-The first three run the permissive `worker` profile installed by `/orca-setup` and follow the
+The first four run the permissive `worker` profile installed by `/orca-setup` and follow the
 shared contract. `freebuff` has no agent in the terminal at all: the coordinator types the
 prompt, polls for a completion marker, verifies the work itself, and signs the result — free, but
 it needs you present, and only **one freebuff worker can run per machine** so its tasks are a
-queue rather than a fan-out. Launch recipes for all four ship with `/orca-orchestrate` (its
+queue rather than a fan-out. Launch recipes ship with `/orca-orchestrate` (its
 `runtimes.md`); the freebuff loop is `/orca-freebuff`.
 
 ### Agent profiles per host
@@ -130,10 +134,12 @@ queue rather than a fan-out. Launch recipes for all four ship with `/orca-orches
 | opencode | `~/.config/opencode/agents/` | `OPENCODE_CONFIG_CONTENT='{"default_agent":"worker"}' opencode --auto` |
 | Claude Code | `~/.claude/agents/` | `claude --agent worker --permission-mode bypassPermissions` |
 | Grok | `~/.grok/agents/` | `grok --agent worker --always-approve` |
+| Hermes | profiles `orca-worker` / `orca-orchestrator` (SOUL.md + `approvals.mode: off`), skills fallback in `~/.hermes/skills/` | `orca-worker chat` (wrapper alias) or `hermes chat --skills orca-worker --yolo` |
 
 Adding a host is one directory: drop `agents/<host>/{worker,orchestrator}.md` headers next to the
-shared contracts and teach `install-agents.sh` its destination. The validator discovers hosts from
-the directory listing and fails the build if the installer does not know one.
+shared contracts and teach `install-agents.sh` its destination (Hermes shows the one exception —
+no agents directory, so its pair installs as skills). The validator discovers hosts from the
+directory listing and fails the build if the installer does not know one.
 
 ### Choosing agents in Claude Code
 
