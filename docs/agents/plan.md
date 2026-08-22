@@ -1,94 +1,64 @@
-# Plan — orca-skills: skill `orca-freebuff` pour workers TUI pilotés au terminal
+# Plan — orca-skills — 2026-08-21
 
-Status: draft — à approuver (spike de faisabilité validé ce jour)
+## Objective
+Close the grok-runtime honesty gap measured on `run_73627a191505`: a coordinator who follows this suite literally can dispatch, watch, merge, and tear down a grok worker without hitting an undocumented stall. The two-step recipe stays (it is what makes the permissive `worker` profile selectable). Promises that recipe cannot keep are withdrawn.
 
-## Objectif
+## Context
+- Intake: `BRIEF-frictions-runtime-grok.md` (9 frictions from candigo `run_73627a191505`, 5 grok dispatches, PRs #59–#63).
+- Host grok landed in `4bc69d3`. Verification this session: Orca `1.4.185`, grok `1.0.5`, `gh` `2.83.1`. Point 6 reproduced here (`check --peek` with no bound Run → `{count:0, ok:true}` vs `gate-list` → `run_required`). Point 2 is a structural contradiction in `skills/orca-orchestrate/runtimes.md` vs the Orca `worker-read` contract, not a grok bug.
+- Setup marker: `docs/agents/setup.md` (written this session). Merge gate `ci: github-actions`. Tracker `github`. Default runtime `opencode`.
+- Prior plan in this file was the executed `/orca-freebuff` plan — superseded.
 
-Ajouter à la team de workers Orca des agents **gratuits freebuff** (CLI fourni par
-freebuff.com, financé par la pub, modèle DeepSeek V4 Flash 07/31 « unlimited »). Freebuff n'est
-pas un agent Orca natif et n'a **aucun mode headless** : la seule voie est de le piloter comme
-un TUI dans un terminal de worktree, via `orca terminal send/read/wait`. Livrable : une skill
-dédiée `skills/orca-freebuff/SKILL.md` codifiant la recette complète (préflight, dispatch,
-launch, injection de tâche, boucle de complétion par marqueur, `worker_done` impersoné, merge,
-cleanup) pour qu'un orchestrateur puisse dispatcher une tâche à un worker freebuff sans
-improviser.
+## Decisions
+- Keep the two-step launch (`terminal create --command "grok --agent worker --always-approve"`, then `worker-start --terminal`). Do not switch to `worker-start --agent grok`.
+- Withdraw the supervised-path transcript promise. Grok's `-p` headless mode remains real and stays in COMPAT.md; it is not what `worker-read` gets on this recipe (`external_terminal` → `session_not_reported`).
+- Folder trust is a distinct gate from `--always-approve`. Document the invite; add `--trust` only if the installed grok accepts it (completions and hooks doc say yes; `grok --help` omits it — probe, do not assume).
+- `tui-idle` is not grok-ready. Readiness is `terminal read` for the real TUI markers (`always-approve` in the status bar and the `❯` prompt).
+- `worker-release` → `retained / external_terminal` is nominal for this recipe. Close the terminal yourself, before `worktree rm`.
+- Merge without `--delete-branch` while the task worktree still exists; delete the branch after `worktree rm`.
+- `check --peek` without a bound Run is unknown, not empty. Bind or `run-use` before concluding the mailbox is empty.
+- Tracker recorded in `docs/agents/setup.md` wins. A marker that says no issue mirror is a valid recorded choice; `/orca-tasks` must honor it rather than fight it. This repo's own tracker is full `github` (issues + PRs).
+- Heartbeat wakeups and concatenated JSON / stderr keepalives are documented, not "fixed" in Orca.
+- No worker is dispatched for this run. The orchestrator authors each isolated branch. Do not dispatch grok to document grok.
+- Orca CLI changes (custom argv on `--agent grok`, `check --peek` returning `run_required`, stdout JSON concat as a binary bug) are out of this repo.
 
-## Faits vérifiés ce jour (spike réel)
+## Out of scope
+- Patching the Orca binary or grok CLI.
+- Replaying the candigo run.
+- Making grok the default worker runtime of *this* repo.
+- Shipping `BRIEF-frictions-runtime-grok.md` as a skill.
+- Regenerating `docs/diagrams/orca-pipeline.*`.
+- A `docs/agents/setup.md` tracker enum validator unless t4's spec needs a shared token list to stay consistent.
 
-- CLI `freebuff` v0.0.149 installé (`~/.local/bin/freebuff`, npm global ; launcher télécharge
-  un binaire Bun dans `~/.config/manicode/freebuff`). Options : `login` (sous-commande),
-  `--continue`, `--cwd`. **Aucun mode headless** — `--print`, `-p`, `--json`,
-  `--non-interactive`, `--batch`, `--exec`, `--auto`, `--script`, `--prompt` sont tous rejetés
-  en `unknown option`.
-- Le SDK Codebuff (`@codebuff/sdk`) est une voie **payante** (API key) → hors périmètre
-  « gratuit ».
-- Spike sur worktree réel `spike-freebuff` (isolé) : freebuff se lance en TUI dans un terminal
-  Orca, affiche **DeepSeek V4 Flash 07/31 · unlimited**, aucun login de compte ni pub bloquantes
-  (déjà authentifié via `~/.config/manicode/credentials.json` ; pas de sélecteur de modèle).
-- L'injection de prompt fonctionne : `orca terminal send --text "<tâche>" --enter` est traité
-  par le modèle (phase Thinking visible, réponse rendue).
-- **`tui-idle` seul ≠ fin de tâche** : il satisfait pendant les micro-pauses de streaming. La fin
-  se détecte par un **marqueur unique demandé dans la réponse + boucle de polling**
-  (wait tui-idle → read → grep du marqueur ; répéter), car l'extraction du texte final est
-  noyée dans le rendu TUI (ASCII-art + écho du prompt + thinking).
-- **Joint d'intégration orchestrateur prouvé** : `worker-start` et `dispatch --inject` refusent
-  un terminal non-agent (`agent_unconfigured`). Le chemin qui marche (validé de bout en bout,
-  task `completed` avec provenance `reportedBy: <terminal freebuff>`) :
-  1. `orca orchestration dispatch --task <id> --run <run_id> --to <worker_handle> --json`
-     (sans `--inject`) → crée un dispatch lié au terminal TUI.
-  2. Prompt envoyé manuellement via `terminal send` (pas d'injection runtime).
-  3. À la complétion (marqueur + idle), le coordinateur envoie depuis **son** cockpit :
-     `orca orchestration send --type worker_done --subject succeeded --outcome succeeded
-     --task-id <id> --dispatch-id <ctx_id> --from <worker_handle> --run <run_id> --json`
-     → lifecycle `action: completed`, task marquée `completed` automatiquement.
-- Le worker freebuff n'exécute pas de commandes shell (tout texte envoyé part dans le prompt du
-  modèle) → **le `worker_done` est toujours impersoné par le coordinateur** (`--from
-  <worker_handle>`) ; c'est le seul écart documenté par rapport au runbook `/orca-orchestrate`,
-  où le worker s'annonce lui-même.
+## Tasks
 
-## Tâches
+### t1: Honest grok recipe
+- spec: Edit `skills/orca-orchestrate/runtimes.md` (and the grok row of `docs/COMPAT.md`) so the prescribed grok launch is honest. Keep the two-step command that selects `--agent worker` and `--always-approve`. State that this path is an `external_terminal` and `worker-read --source auto` will not return a hook-reported Grok transcript (`fallbackReason: session_not_reported` is expected). Qualify "has a real headless mode" as `grok -p` / `--prompt-file`, not the supervised TUI path. Document the first-launch folder-trust invite (`Do you trust the contents of this directory?`) as a gate `--always-approve` does not cover; persist via `--trust` only after probing that the installed grok accepts the flag. Replace `tui-idle` as the grok availability step with `terminal read` until the status bar shows `always-approve` and the prompt is `❯`. Do not edit `orca-orchestrate/SKILL.md` in this task (t2 owns the settle loop). Seam: `node scripts/validate-skills.mjs` green; every relative link in the touched files still resolves. TDD does not apply to prose — the failing check is a coordinator who follows the page as written stalling on trust, `tui-idle`, or `worker-read`.
+- blocked-by: none
+- runtime: opencode
+- isolated: yes
+- budget: 45
 
-### t1 — Écrire `skills/orca-freebuff/SKILL.md` (isolé: no)
+### t2: Two-step settle loop
+- spec: Edit `skills/orca-orchestrate/SKILL.md` so the DAG settle path matches the recipe t1 tells the truth about. Treat `worker-release` → `retained / external_terminal` as the nominal outcome of `terminal create` workers (all three supervised runtimes), then `orca terminal close` before `worktree rm`. Change the merge sequence so `gh pr merge --squash --delete-branch` is never run while the task worktree still exists: merge without deleting the branch, release, close the external terminal, `worktree rm --force`, then delete the remote branch. Watchdog: if `worker-read` returns `source: "terminal"` / `session_not_reported`, fall through to `terminal read` rather than treating an empty message list as a quiet-but-healthy worker. One sentence on `--wait --types worker_done,escalation,question`: type filters decide *when* the waiter wakes; the Delivery is still the oldest full batch, so heartbeats produce empty-looking windows. One sentence on `check --json`: keepalives go to stderr every 15s; concatenated JSON objects need a decoder loop, not a single `json.load`. Add or update the matching `docs/COMPAT.md` row for Orca `check`. Seam: `node scripts/validate-skills.mjs`; TDD does not apply — the check is the merge/teardown order a coordinator can follow without a cosmetic git error or a leaked terminal.
+- blocked-by: t1
+- runtime: opencode
+- isolated: yes
+- budget: 45
 
-Repo sans setup marker, sans tracker ni CI → run non isolé sur le worktree principale
-(integration pass), fait par le coordinateur, sans worker (comme la PR #1).
+### t3: Peek without a Run is unknown
+- spec: Edit `skills/orca-resume/SKILL.md` and `skills/orca-status/SKILL.md` so `orca orchestration check --peek` is never treated as an empty mailbox unless a Run is bound (`run-current` shows a run, or the call used `--run <id>`). Without that, `{ok: true, count: 0}` is a false negative — `gate-list` already fails with `run_required` in the same situation. Positive rule: read `run-current` (or pass `--run`) before reporting mail; if none is bound, say so and do not conclude "0 unread". Seam: `node scripts/validate-skills.mjs`; TDD does not apply.
+- blocked-by: none
+- runtime: opencode
+- isolated: yes
+- budget: 30
 
-Contenu de la skill :
-- Frontmatter calqué sur les skills du repo (`disable-model-invocation: true`, invocation
-  `/orca-freebuff`) + row dans le README.
-- Préflight : vérifier le CLI (`freebuff --version`), le login (`~/.config/manicode/
-  credentials.json`), le worktree personnel, les quotas (sessions premium/jour, fallback Flash).
-- Dispatch : run-use → task-create → `worktree create` (name slug) → `terminal create --command
-  "freebuff"` → `terminal wait --for tui-idle` (écran d'accueil ignorable) →
-  `dispatch --task ... --to <handle>` **sans --inject**.
-- Injection : prompt de tâche via `terminal send --text ... --enter`, contenant TOUJOURS le
-  contrat de marqueur (finir par `FREEBUFF_TASK_DONE` sur sa propre ligne) + les consignes de
-  travail (branche actuelle, ne pas pushé soi-même, rapporter un résumé).
-- Boucle de complétion : répéter `wait --for tui-idle` + `terminal read` + grep du marqueur,
-  avec bornes (fenêtres 60-120 s, timeout global par tâche) ; ne jamais déclarer fini sur un
-  seul idle.
-- Clôture : vérifier le travail réel (git status/diff dans le worktree, tests si le plan les
-  exige) → `worker_done` impersoné (`--from <worker_handle>`) → settle, merge green
-  (coordinateur), `worker-release`, `worktree rm --force`, fermer le terminal TUI.
-- Échecs : si le marqueur ne sort jamais dans la fenêtre ou si le modèle dérive (ne suit pas le
-  contrat), `terminal send` d'une relance bornée, puis gate au user — jamais de redispatch
-  silencieux.
-- Section « pourquoi pas headless ni SDK » : les flags rejetés et le SDK payant, pour éviter de
-  retenter.
+### t4: Tracker marker wins
+- spec: Edit `skills/orca-setup/SKILL.md` and `skills/orca-tasks/SKILL.md` (README tracker table only if the new token must be visible there) so a setup marker that records GitHub follow-by-PR with **no issue mirror** is a first-class, recorded choice, not a coordinator improvisation. Introduce one explicit tracker token (do not parse free prose). `/orca-setup` may offer it; `/orca-tasks` step 5 follows the marker: mirror issues only for `github` and `linear`; skip issue create and worktree `--issue` / `--linear-issue` links when the marker says so. Precedence is one sentence in both skills: the marker wins. This repo's own marker stays full `github`. Seam: the token string is identical in setup and tasks (grep); `node scripts/validate-skills.mjs` green. TDD does not apply unless you add a validator assertion that the two skills list the same tracker tokens — do that only if it is a one-place list, not a duplicated enum.
+- blocked-by: none
+- runtime: opencode
+- isolated: yes
+- budget: 45
 
-### t2 — Validation réelle de la skill (isolé: no)
-
-Après t1, relire la skill et la suivre littéralement sur un mini-run réel dans un worktree de
-test jetable (réutiliser le worktree `spike-freebuff` existant ou en créer un), comme le spike
-mais **en suivant la recette écrite** — preuve que les commandes de la skill sont exécutables
-telles quelles. Critère de sortie : le mini-run atteint `worker_done succeeded` et la task passe
-`completed`, sans éditer `main`. Résultat consigné dans le corps de la PR de t1 (ou commit
-suivant).
-
-## Seams / tests
-
-- Pas de code applicatif ni de CI sur ce repo : le gate de t1 = relecture de la skill (lecture
-  cohérente de bout en bout, commandes alignées sur le guide `orca-cli` et `orchestration`) +
-  validation réelle de t2.
-- Le seul risque résiduel déjà acté : `tui-idle` n'est pas un signal de fin fiable — la skill
-  l'encode explicitement (marqueur + polling), et la validation t2 l'exerce.
+## Status
+approved (2026-08-21)
