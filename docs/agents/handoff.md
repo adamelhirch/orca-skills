@@ -2,104 +2,61 @@
 
 ## Summary
 
-An architecture review of the suite turned into seven merged PRs (#3–#9) that closed the gaps it
-found: the repo now has CI of its own, the merge gate is a real capability instead of a phrase,
-the DAG loop closes the gates it opens, the suite gained observability (`/orca-status`) and a
-worker-runtime choice, and Grok joined as a fourth agent host. Every change was validated against
-the live binary rather than assumed, and the freebuff runtime was exercised end to end on a real
-throwaway project. `main` is green and clean at `c7182df`; nothing is in progress.
+The grok-runtime honesty run is closed. `run_4cec44f0b982` (t1–t4) is fully `completed`; PRs #14–#17 are squash-merged, issues #10–#13 closed, CI `validate-skills` green on each. `origin/main` is at `d2f7d1d`. The cockpit checkout is **four commits behind** that tip and still holds uncommitted pipeline docs. Nothing is in flight.
 
 ## Orca state
 
-- Worktree: `main` (`isMainWorktree: true`), branch `refs/heads/main`, HEAD `c7182df`
-  ("feat(setup): install-agents.sh links the suite's skills for opencode (#9)").
-- Working tree clean. No other worktree of this repo exists.
-- Card comment is **stale** — still reads "resumed; orca-freebuff skill merged (PR #2, 2ab4092)".
-  Updated as the last step of this handoff.
-- Live terminals in this repo: 2 — `term_96dd20da` ("Terminal 1", idle shell) and `term_21fb496f`
-  (this Claude Code session). Neither is a worker.
-- CI: `lint` green on the last three runs.
+- Worktree: `main` (`isMainWorktree: true`), id `e37eaec6-7d90-47de-b1cd-01017c9742b8::/Users/adamelhirch/orca/workspaces/AdamHUB/orca-skills`.
+- Local HEAD `489fe1e` (`handoff: architecture hardening…`). `origin/main` `d2f7d1d` (`fix(orchestrate): two-step settle (#17)`). Divergence: #14, #15, #16, #17 are on origin, not in this working tree.
+- Dirty / untracked on cockpit: `docs/agents/plan.md` (modified), `docs/agents/setup.md` (untracked), `BRIEF-frictions-runtime-grok.md` (untracked intake; not a skill).
+- Card comment (pre-handoff): `run_4cec44f0b982 complete: t1-t4 merged PRs #14-#17`.
+- Only this repo worktree exists (`git worktree list`: cockpit only). Task worktrees t1–t4 were `worktree rm --force`d; remote branches deleted.
+- Terminals in this repo: `term_247c220d` (this Grok orchestrator). No task-worker terminals.
+- Host-wide `worker-list --terminal-state reclaimable`: `workers: []`. Counts `retained: 58` / `released: 1` are **host-wide**, not this run. This run's `worker-list --run`: `workers: []`.
+- Merge gate exercised: `ci: github-actions`. Last five Actions runs on this repo: `success`.
 
 ## Coordination
 
-- **Drift worth knowing:** this coordinator terminal is still bound to `run_f6e69b04489e`, whose
-  objective ("e2e freebuff: implémenter slugify") belongs to a **different project** —
-  `~/orca/workspaces/AdamHUB/orca-e2e-freebuff`. This repo has no run of its own; the work here
-  went through plain branch → PR → CI → squash-merge.
-- That run is fully settled: `task_f746bf59f8a9` and `task_20e3e536b852` both `completed`,
-  0 pending gates, 0 unread mail (peeked, not consumed), 0 reclaimable worker terminals.
-- The e2e project itself is clean: only `main`, no leftover worktree or terminal, `node --test`
-  green (`pass 2 / fail 0`), four commits telling the whole run.
+- Bound Run: `run_4cec44f0b982`. Objective: close the grok-runtime honesty gap measured on candigo `run_73627a191505`. Two-step recipe stays; promises it cannot keep are withdrawn.
+- Tasks (all `completed`, ready list empty):
+  - `task_1fe183aa61bc` t1 Honest grok recipe → PR #16, issue #10
+  - `task_f1c2f8680c38` t3 Peek without a Run is unknown → PR #14, issue #11
+  - `task_aa614780ccb2` t4 Tracker marker wins → PR #15, issue #12
+  - `task_41ceacbf3172` t2 Two-step settle loop (blocked-by t1) → PR #17, issue #13
+- Pending gates: 0.
+- Unsettled dispatches: none. No `worker-start` TUI workers this run (plan: coordinator authors isolated branches; do not dispatch grok to document grok).
+- Mail: Run is bound; `check --peek` → `ok: true, count: 0` (empty, not unknown). Not consumed.
 
 ## Plan
 
-- `docs/agents/plan.md` is **stale**: it is the approved-and-executed plan for `/orca-freebuff`
-  from 2026-08-18. None of this session's work was planned through it.
-- **There is still no `docs/agents/setup.md` in this repo.** The suite does not yet run its own
-  gate chain (finding ⑨ of the review). Its merge gate would now be `ci: github-actions` since
-  PR #3 added the workflow, but the tracker choice is the user's and was not made.
+- `docs/agents/plan.md` — **approved (2026-08-21)**, executed. Still only on the cockpit working tree (not on `origin/main`).
+- `docs/agents/setup.md` — **setup complete**, written this session, **untracked**. Tracker `github` (full issues+PRs, not `github-pr`). Worker runtime default `opencode`. Merge gate **`ci: github-actions`**.
+- Prior rolling handoff (`docs/agents/handoffs/2026-08-21-architecture-hardening-and-grok.md`) is superseded by this one.
 
 ## Decisions
 
-Seven PRs, each fixing something measured rather than suspected:
+Recorded in `docs/agents/plan.md`; do not reopen without a new plan.
 
-- **#3 — CI for the suite itself.** It had none: both prior PRs merged with
-  `statusCheckRollup: []`. `scripts/validate-skills.mjs` asserts frontmatter shape, manifest and
-  README coverage, and link resolution. It caught `orca-freebuff` missing from `skills.sh.json`
-  on its first run. Added `docs/COMPAT.md`; dropped 537 KB of generated artifacts.
-- **#4 — the merge gate became a capability.** Measured: `gh pr checks` prints `no checks
-  reported` and **exits 0** on a repo with no workflows, so a worker could report `succeeded`
-  having run nothing. `/orca-setup` now records `ci: github-actions | local <cmd> | unverified`.
-  Same PR closed the gate loop (`gate-list`/`gate-resolve` appeared **nowhere** in the repo) and
-  single-sourced the agent contract into `agents/_shared/`.
-- **#5 — `/orca-status`.** The suite had no observability: `worker-list`, `gate-list`, `inbox`,
-  `run-show`, `worker-stop` were unreferenced anywhere. Also fixed a real bug — both
-  `/orca-resume` and `/orca-handoff` documented `check --unread --inject`; `--inject` does not
-  exist (`invalid_argument`) and `--unread` **marks messages read**, so a read-only orientation
-  was consuming the mailbox. Now `--peek`.
-- **#6 — worker runtime chosen at setup**, independent of the orchestrator, overridable per task.
-  Recipes live in `skills/orca-orchestrate/runtimes.md`. Added the validator rule that a
-  `SKILL.md` may not link outside its own directory (installed skills are standalone).
-- **#7 — two freebuff constraints, measured live.** One instance per machine (a second refuses
-  with *Take over / Exit*), so freebuff tasks are **strictly serial**; and the session is a
-  **one-hour wall-clock window**, not a task counter (42m → 41m after a 20s task → 37m idle). A
-  task consumes minutes, never a session; a new terminal joins the running session.
-- **#8 — Grok as a fourth host and runtime.** `--agent` + `permission_mode: bypassPermissions`,
-  verified headlessly. Grok reads `~/.claude/agents/` only as *subagents*, so the pair genuinely
-  needs `~/.grok/agents/`. Hosts are no longer hardcoded — the validator discovers them and fails
-  if the installer does not know one.
-- **#9 — `install-agents.sh` links the suite's skills for opencode.** `skills add` wires Claude
-  Code and Grok automatically but not opencode, which reads `~/.config/opencode/skills`; an
-  opencode session had the agents and none of the `/orca-*` commands.
-
-Validated end to end on `~/orca/workspaces/AdamHUB/orca-e2e-freebuff`: a free opencode
-orchestrator (`opencode-go/deepseek-v4-flash`) drove a free freebuff worker through
-setup → plan → tasks → dispatch → verify → merge without leaving the contract. It caught a broken
-test command in the scaffold and refused to engrave a gate that tested nothing.
+- Keep two-step grok launch (`terminal create --command "grok --agent worker --always-approve --trust"` then `worker-start --terminal`). Do not use `worker-start --agent grok`.
+- That path is `external_terminal`. `worker-read --source auto` returns `source: "terminal"` / `fallbackReason: session_not_reported`. `-p` / `--prompt-file` remains real headless; it is not the supervised TUI path.
+- Folder trust ≠ `--always-approve`. `--trust` accepted on grok `1.0.5` (`grok --help` still omits it). Availability = `terminal read` until status bar `always-approve` and prompt `❯`.
+- Settle: `gh pr merge --squash` → `worker-release` → `terminal close` → `worktree rm` → `git push origin --delete <branch>`.
+- `check --peek` without a bound Run is **unknown**, not empty. Token `github-pr` is first-class; **the setup marker wins**.
+- Orca CLI patches (custom argv on `--agent grok`, `check --peek` → `run_required`, stdout JSON concat as a binary bug) stay out of this repo.
 
 ## In progress / next
 
-Nothing in progress. Open threads, none blocking:
+Nothing in flight. Open threads, none blocking the DAG:
 
-1. **This repo does not run its own gate chain.** No `docs/agents/setup.md`; `plan.md` is stale.
-   Closing it needs one decision from the user: the tracker (github, given the remote).
-2. **The opencode `question` tool deadlocks a terminal-driven orchestrator.** Its question widget
-   blocks the agent loop, and text sent via `orca terminal send` lands in the message queue as
-   `QUEUED` instead of answering it. Harmless while a human orchestrates at the keyboard; a hard
-   blocker for orchestrator-driving-orchestrator. The `worker` profile already denies `question`
-   for this reason.
-3. **The pipeline diagram is stale** — `docs/diagrams/orca-pipeline.png` predates `/orca-status`
-   and `/orca-freebuff`. Captioned honestly as covering the five-step main path; regenerating it
-   is an archify job of its own.
-4. **The e2e test project still exists** at `~/orca/workspaces/AdamHUB/orca-e2e-freebuff`, clean
-   and green. Keep as a fixture or delete.
+1. **Pull `origin/main` on the cockpit** (`489fe1e` → `d2f7d1d`) so local `main` matches GitHub. Dirty pipeline files must be stashed, committed, or left aside first.
+2. **Commit `docs/agents/setup.md` + `docs/agents/plan.md`** (and this handoff) so the next `/orca-resume` does not depend on an uncommitted working tree. `BRIEF-frictions-runtime-grok.md` is intake; ship it only if you want the dossier in git.
+3. **`/orca-freebuff` still has `gh pr merge --squash --delete-branch`.** t2 updated `/orca-orchestrate` only. Same cosmetic git error on a freebuff settle.
+4. Host-wide retained count (58) is unrelated to this run; do not treat it as leaked grok workers from t1–t4.
 
-Host state as of this handoff: 8/8 skills installed for Claude Code, opencode and Grok; 6/6 agents
-composed from the shared contracts. Sessions started before that still hold the old definitions —
-restart them.
+Owner of 1–3: the next orchestrator session, unless this one continues.
 
 ## Suggested skills
 
-- `/orca-resume` — to pick this up in a fresh session.
-- `/orca-status` — read-only sweep; also what `/orca-resume` and this handoff run.
-- `/orca-setup` — to finally give this repo its own setup marker (thread 1 above).
+- `/orca-resume` — load this handoff, pull `origin/main`, reconcile the uncommitted pipeline docs.
+- `/orca-status` — same sweep this handoff ran; safe any time.
+- `/orca-freebuff` — only if closing thread 3.
