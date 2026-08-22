@@ -119,15 +119,21 @@ orca terminal create --worktree id:<wtId> --title <slug> \
 # skill path instead of the profile:
 #   --command "hermes chat --skills orca-worker --yolo"
 orca terminal wait --terminal <handle> --for tui-idle --timeout-ms 60000 --json
-# tui-idle is necessary, not sufficient (it once fired before the TUI had started):
-# confirm the Ink banner + ❯ prompt are up via `orca terminal read` before binding.
+orca terminal read --terminal <handle> --json
+# ready ONLY when the screen shows the banner line `Profile: orca-worker` and the `❯` prompt.
+# tui-idle is NOT sufficient for hermes: measured firing satisfied:true while the screen still
+# showed the bare shell (same trap as grok). Cold start of a fresh profile is 2-4 minutes
+# (first-run tirith install + MCP servers) — do not declare the worker dead inside that window;
+# later launches on a warmed profile are far faster.
 orca orchestration worker-start --task <task_id> --terminal <handle> --worktree id:<wtId> --json
 ```
 
 Like every supervised recipe this is an `external_terminal`, so expect `worker-read --source auto`
 to fall back to `source: "terminal"` until Orca proves Hermes sessions — no transcript claim is
-made here, and the runtime has not yet been exercised end-to-end on a real run (first run should
-update the Hermes row of the suite's `docs/COMPAT.md` with what it measures).
+made here. Exercised end-to-end once (2026-08-22, Hermes v0.20.5, Orca `1.4.x`): dispatch → the
+worker read its injected preamble → executed the task → sent its own `worker_done`
+(`outcome: succeeded`, correct task/dispatch ids) in 1m44s; the coordinator verified the artifact
+independently. Watch the terminal for anything longer than that.
 
 The cockpit works the same way: coordinate from `orca-orchestrator chat` (or `hermes chat
 --skills orca-orchestrator --yolo`). The `/orca-*` skills are symlinked into `~/.hermes/skills/`
