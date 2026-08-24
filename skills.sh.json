@@ -12,7 +12,8 @@
         "orca-status",
         "orca-handoff",
         "orca-resume",
-        "orca-freebuff"
+        "orca-freebuff",
+        "orca-sprint"
       ]
     },
     {
