@@ -16,7 +16,7 @@ you want to work in, and the runtime for the cost and capability the tasks need.
 | `claude-code` | Claude subscription/API | `~/.claude/agents/worker.md` | itself | tasks wanting Claude Code's tooling |
 | `grok` | xAI account | `~/.grok/agents/worker.md` | itself | another supervised agent runtime; `-p` / `--prompt-file` is real headless, not this TUI path |
 | `hermes` | your Hermes provider key (e.g. ox-alpha via opencode-go) | profile `orca-worker` / skill in `~/.hermes/skills/` | itself | another supervised agent runtime; persistent memory/skills ecosystem |
-| `dsh` | DeepInfra key (~$0.08/M in, $0.016 cached, $0.18/M out on V4-Flash-0731) | none — headless one-shot process, no TUI | itself (native `worker_done`, verified component-level) | cheap mechanical tasks at volume; the token-economy runtime |
+| `dsh` | BitDeer key (primary) + DeepInfra key (fallback), ~$0.08-0.14/M in cached-cheap, ~$0.18/M out | none — headless one-shot process, no TUI | itself (native `worker_done`, pilot-proven) | cheap mechanical tasks at volume; the token-economy runtime |
 | `freebuff` | free (ad-funded) | none — no agent in the terminal | **coordinator, impersonated** | throwaway tasks where free matters — **one at a time** |
 
 `opencode`, `claude-code`, `grok`, and `hermes` are *supervised agent* runtimes: they run the
@@ -28,18 +28,26 @@ one-shot `dsh --profile headless "<task>"` that reads the injected task, works, 
 contract is part of the prompt it receives. `freebuff` is a *driven TUI* runtime: there is no
 agent, the coordinator types into it and signs the result.
 
-`dsh` specifics, all verified at component level on this toolchain (2026-08-24, dsh
-`0.1.1-rc.2`, DeepInfra `DeepSeek-V4-Flash-0731`; **not yet exercised end-to-end in an Orca run**):
+`dsh` specifics, all verified on this toolchain (2026-08-24, dsh `0.1.1-rc.2`; component probes
+on DeepInfra, end-to-end pilot on DeepInfra, provider probes on BitDeer):
 
-- **Model config lives in `$DSH_HOME/settings.yaml`** (`~/.dsh/`), not in flags: a custom
-  provider under `llm-pi-ai.providers.<id>` (`api: openai-completions`,
-  `baseURL: https://api.deepinfra.com/v1/openai`, `apiKeyEnv: DEEPINFRA_API_KEY`) with
+- **Model config lives in `$DSH_HOME/settings.yaml`** (`~/.dsh/`), not in flags: custom
+  providers under `llm-pi-ai.providers.<id>` with `api: openai-completions` and
   `compat: {supportsDeveloperRole: false, maxTokensField: max_tokens, thinkingFormat: deepseek}`
-  — without those switches DeepInfra refuses reasoning-model requests — plus models
-  `deepseek-ai/DeepSeek-V4-Flash-0731` / `-Flash` with `reasoning: true`. Key goes in
-  `~/.dsh/.env` (`DEEPINFRA_API_KEY=...`). Default model row:
-  `agent-default-model: {provider: deepinfra, model: deepseek-ai/DeepSeek-V4-Flash-0731}`.
-  The home-level settings apply to every profile; there is nothing per-worktree to install.
+  — without those switches these gateways refuse reasoning-model requests. Current setup:
+  **`bitdeer` primary** (`https://api-inference.bitdeer.ai/v1`, models `deepseek-ai/DeepSeek-V4-Flash`
+  and `deepseek-ai/DeepSeek-V4-Pro` — BitDeer has **no** `-0731` id; a wrong model id is a bare
+  `400 invalid request`) and **`deepinfra` fallback**
+  (`https://api.deepinfra.com/v1/openai`, ids `deepseek-ai/DeepSeek-V4-Flash-0731` / `-Flash`).
+  Keys go in `~/.dsh/.env` (`BITDEER_API_KEY=`, `DEEPINFRA_API_KEY=`). The default selection is
+  env-commutable via the home patch layer (`~/.dsh/cordis.patch.yml`,
+  `agent-default-model.provider: !!js process.env.DSH_DEFAULT_PROVIDER ?? 'bitdeer'`):
+  `DSH_DEFAULT_PROVIDER=deepinfra dsh …` flips a whole fleet to the fallback. Two traps, both
+  measured: a user-layer `agent-default-model:` section in `settings.yaml` overrides the patch
+  layer at runtime (keep that section absent so the patch stays authoritative), and `!!js`
+  expressions evaluate only in cordis *patch* layers — never in `settings.yaml`. The model id
+  `deepseek-ai/DeepSeek-V4-Flash` is served by both providers, which makes the switch drop-in.
+  Nothing per-worktree to install.
 - **No trust/approval gate exists** (nothing to cover with a flag), and the shipped permission
   preset is `workspace-write`: bash + filesystem mutations are confined to the session workspace
   and platform temp roots by the harness itself (Seatbelt sandbox on macOS) — reads/network stay
