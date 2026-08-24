@@ -67,6 +67,18 @@ pipeline above is the current overview until the diagram is regenerated.
 | `/orca-handoff` | Write a durable project handoff (Orca state + plan + session context) so a fresh orchestrator session resumes without losing context. |
 | `/orca-resume` | Resume an Orca project: setup gate, load handoff + plan, reconcile with live Orca state, flag drift, re-anchor. |
 | `/orca-freebuff` | Run the `freebuff` worker runtime: free (ad-funded) coding agents driven as terminal TUIs. No headless mode exists, so the orchestrator injects the prompt, polls for a completion marker, verifies the work itself, and impersonates `worker_done` from the cockpit. |
+| `/orca-sprint` | BMad bridge — run a BMad Method sprint through Orca: cut `ready-for-dev` stories from BMad's `sprint-status.yaml` into a `-dev` task plus a blocked `-review` task per story (deliberately different models per role), dispatch, own every status transition and merge. |
+
+### BMad Method integration
+
+Where a project installs the [BMad Method](https://github.com/bmad-code-org/BMAD-METHOD)
+(`npx bmad-method install`, verified on v6.11.0), **BMad owns the method** — brief → PRD →
+architecture → epics/stories → `sprint-status.yaml` → retrospective, through its own `bmad-*`
+skills — and **Orca is only the execution engine**: worktrees, branches, dispatches, supervision,
+merge gate. `/orca-sprint` is the bridge; it consumes BMad's tracking file and never re-plans.
+Per BMad's own review rule (fresh context, different model), each story runs as a cheap-model dev
+task and a strong-model review task. The forge-* family below remains the standalone distillation
+for projects without a BMad install.
 
 ## Forge family — product & engineering lifecycle
 
