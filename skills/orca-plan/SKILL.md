@@ -49,6 +49,12 @@ is an unsettled prerequisite, so only the questions downstream of it wait for th
 report — ask the rest of the frontier now. The *decisions* are the user's — put each to them and
 wait.
 
+Verify spec facts before they enter a plan. A claim a worker can falsify (an endpoint's shape,
+a function name, a per-page count) gets checked against its source first — workers have burned
+whole budgets discovering `db.connect()` did not exist, or refuting a count the plan asserted
+outright. Anything you could not verify goes into the spec marked as an **assumption**, so the
+worker tests it instead of trusting it. A refuted spec is plan debt, not worker error.
+
 Interview until the frontier is empty: every branch of the design tree visited, nothing left
 silently assumed. Do not write the plan before the user confirms the shared understanding.
 
@@ -56,7 +62,15 @@ silently assumed. Do not write the plan before the user confirms the shared unde
 
 - **Goal and scope** — what done looks like, what is explicitly out of scope.
 - **Task decomposition** — the natural slices and their dependency edges. Keep chains shallower
-  than 3-4 steps (each task sized to one fresh worker context window).
+  than 3-4 steps (each task sized to one fresh worker context window). **File ownership is part
+  of decomposition:** two tasks that both write the same file are scheduled conflicts you have
+  not planned yet — every observed multi-rebase run had one shared `README.md`/`__init__.py` to
+  blame. Split by file ownership (one task owns the file and others hand it their entries), make
+  the shared-file update its own task, or serialize the writers with a dependency edge.
+- **Knowledge sinks** — tasks that discover durable facts (API shapes, endpoints, environment
+  quirks) must be told *where in the repo* to write them down (`docs/`, module READMEs), not
+  just in the `worker_done` body: the next task cannot read another task's mail, and rediscovering
+  paid-for knowledge is pure waste. Name the sink per task in the spec.
 - **Test seams** — the pre-agreed seams each task tests at, and whether TDD applies (default:
   yes). Seams must be settled *now* because the worker cannot ask mid-run.
 - **Isolation** — which tasks run in their own worktree/branch (default: all) vs. explicitly
@@ -68,7 +82,10 @@ silently assumed. Do not write the plan before the user confirms the shared unde
   independent of the agent the orchestrator itself runs in. Override it per task when the mix
   is worth it — cheap mechanical work to `freebuff`, design-sensitive work to a paid runtime —
   and remember a `freebuff` task needs the coordinator present to poll and sign it, so it must
-  not sit on the critical path of an unattended stretch. Settle model/effort choices here too.
+  not sit on the critical path of an unattended stretch. Settle model/effort choices here too,
+  and name the **model** explicitly when it is not an already-proven one: small local models
+  have burned whole runs in repetition loops and empty responses while looking busy (see
+  `runtimes.md`, "Model reliability") — an unproven model gets one canary task before fan-out.
 
   Two `freebuff` specifics change the shape of a plan, not just its cost: only **one** freebuff
   worker can run on a machine at a time, so several freebuff tasks are a queue costing the **sum**
@@ -118,6 +135,12 @@ End by presenting the plan summary in conversation and asking for approval. Only
 "approved" do you set `Status: approved` + date in the plan doc. `/orca-tasks` refuses to run on
 a plan that is not approved. Approval is a doc state, not an Orca gate — it survives
 `/orca-resume`.
+
+**Commit the approved plan** (`git add docs/agents/plan.md && git commit`): task worktrees
+branch off `main`, and an uncommitted plan exists only in the cockpit checkout — workers
+dispatched against it cannot read their own spec, and three workers on a past run reported the
+unversioned `plan.md`/`setup.md` as a defect mid-run. Same for every later plan edit that
+changes a spec still being executed.
 
 ## Done when
 

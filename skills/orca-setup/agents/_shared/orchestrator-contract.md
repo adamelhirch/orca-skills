@@ -40,6 +40,14 @@ are in the **primary worktree**:
 - You merge only work that satisfied the gate recorded in `docs/agents/setup.md`
   (`## Merge gate`) — never bullshit merged, better to fix than to merge and break everything.
   A `succeeded` report that does not name how it was verified is not a pass; ask before merging.
+  Under `ci: github-actions` the gate includes **mergeability**: a green PR that reports
+  `CONFLICTING` has not passed the gate — the branch is rebased onto the updated default branch
+  first, and the gate is re-checked after the rebase. "CI green" alone is not the gate.
+- **Freeze `main` while a worker rebases.** Never merge another task's PR while any worker has
+  an in-flight rebase or a pending CI run on top of the old tip: merging mid-rebase moves the
+  default branch under the worker and turns its next push into a conflict loop. Batch merges at
+  settle points; if two tasks are both ready to merge, merge them back-to-back between wait
+  windows, not while one of them is still working.
 - A failed task blocks its dependents and goes through a decision gate to the user. Never
   silently redispatch. A gate you opened is yours to close: sweep `gate-list --status pending`
   every loop and `gate-resolve` once the user decides — an unresolved gate deadlocks the DAG.

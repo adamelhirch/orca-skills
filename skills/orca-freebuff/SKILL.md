@@ -232,11 +232,14 @@ The lifecycle marks the task completed automatically (`action: completed`, prove
 worker_done also **auto-settles the dispatch**: a later `worker-release --dispatch ...` returns
 `dispatch_not_found` — that is the expected outcome of this pattern, skip the release step.
 
-Then merge green work as the coordinator always does (github: `gh pr merge --squash
---delete-branch` after CI; local/linear: squash-merge into the cockpit main), then:
+Then merge green work as the coordinator always does, then:
 
 ```bash
+# github: squash-merge WITHOUT --delete-branch (the worktree still holds the branch;
+# --delete-branch fails every time — delete after worktree rm instead)
+gh pr merge <pr_number> --squash
 orca worktree rm --worktree <task_worktree_id> --force --json
+git push origin --delete <branch>                 # only after worktree rm
 orca terminal close --terminal <handle> --json    # freebuff terminals are external; close them
 ```
 

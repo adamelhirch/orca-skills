@@ -208,6 +208,12 @@ Pick the flow by the state of the target directory:
    ## Guides             (orca orchestration + orca-cli present in the binary)
    ## Status             (setup complete | skipped — <reason>)
    ```
+
+   **Commit it before any dispatch** (`docs/agents/setup.md`, and later `docs/agents/plan.md`
+   once approved): task worktrees are branches off `main`, so an untracked marker exists only in
+   the cockpit checkout. Workers literally cannot read the merge gate you hold them to — three
+   independent workers have flagged exactly this mid-run. Uncommitted pipeline docs are a
+   defect, not a formality.
 11. Point the primary worktree card at it:
    `orca worktree set --worktree <primary-selector> --comment "setup → docs/agents/setup.md"`.
 
@@ -230,6 +236,8 @@ Tasks tab. `/orca-tasks` sets the worktree link after creating a mirror issue fo
   confirmed present), `local <command>` (command run once and confirmed), or `unverified`
   (explicitly accepted by the user, with the reason). A project whose gate is unrecorded cannot
   be orchestrated — the worker has no definition of "verified".
+- The marker (and, later, the approved plan) are **committed**, not just written: worker
+  worktrees branch off `main` and cannot read cockpit-only files.
 - The official guides (`orca orchestration`, `orca-cli`) are confirmed present in the binary, and
   every pipeline skill is installed for this host (no missing skill, no ghost of a retired one).
 - The **worker runtime** default is recorded and confirmed usable, chosen independently of

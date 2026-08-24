@@ -34,6 +34,34 @@ the result. That difference is the whole reason to prefer the first two by defau
 
 Both are detailed in `/orca-freebuff`.
 
+## Model reliability and provider fallback
+
+The runtime is the agent harness; the **model behind it** is a separate failure surface, and it
+is the one that produced every zero-output worker observed so far. A weak or flaky model does
+not fail loudly — it loops (`Force-push.` ×14, each time *announcing* an action it never
+executes), repeats phrases verbatim, emits raw tool-call XML as text with leaked `</think>`
+tags, returns empty responses (`Empty response … response_len=7, tool_turns=0`), or abandons at
+~80 % with a tidy to-do list instead of settling. One measured run: 3 of 5 workers on a small
+local model produced zero files in ~35 minutes at low context usage; 3 of 5 on the same family
+via another provider died on empty first turns; two more burned whole budgets in semantic loops.
+Equivalent specs ran clean on stronger models. The harness was never the bottleneck.
+
+- **Canary rule: an unproven model gets one task, not five.** A new model/provider earns
+  fan-out only after completing one real task end-to-end (work pushed, merge gate green,
+  `worker_done` settled). One task is the cheapest canary you will ever buy.
+- **Name the model in the plan** (`## Worker runtime + model`) whenever the default is not a
+  proven one, so the choice is deliberate and reviewable after the fact.
+- **Set a provider fallback before the run.** A worker whose provider dies mid-run
+  (`HTTP 400 — Model is unavailable`) just dies; where the host supports a fallback model list,
+  configure it at setup, not during the incident.
+- **Degenerate output is a failed dispatch, not a slow worker.** Repetition/announcement loops,
+  XML-as-text, and repeated empty responses do not recover into useful work — escalate early
+  with the terminal evidence instead of waiting out the full budget.
+- **Abandonment is a signature too.** A worker idle at its prompt at ~80 % with a "remaining
+  work" list has ended its turn without settling: same watchdog path as any unsettled dispatch —
+  re-inject the finalization from its own terminal, or cut the remainder into a follow-up task
+  that names what the branch already holds.
+
 ## Dispatch recipes
 
 All supervised runtimes follow the same shape — **create the worktree, launch the terminal, then

@@ -107,6 +107,12 @@ creates gates deadlocks the DAG by construction.
    before each freebuff launch, check the session window covers the task's `budget:` — the details
    are in `/orca-freebuff`.
 
+   **Screen the model before fanning out.** The model behind a runtime is a separate failure
+   surface from the runtime itself (see `runtimes.md`, "Model reliability"): repetition loops,
+   empty responses, and silent abandonment are model failures that look like busy workers. An
+   unproven model gets exactly one task before earning parallel dispatch; a worker showing a
+   degenerate-output signature climbs the escalation ladder now, not at budget.
+
    Use a fresh terminal per worker (one worktree = one branch = one worker). Reuse a worker
    terminal only for an immediate follow-up Task on the same worktree, and only when the plan
    allows it. Tasks the plan marked `isolated: no` are the sole exception to the worktree rule —
@@ -128,14 +134,20 @@ creates gates deadlocks the DAG by construction.
    is a checkpoint. Keep waiting until every dispatch settles; workers routinely run 15-60
    minutes. Parse `--json` keepalives with a decoder loop; the versioned fact is the Orca
    `check` row in `docs/COMPAT.md`.
+   When a window wakes, read before you wait again: a worker whose last lines repeat the same
+   announcement or intent (a semantic loop), or that sits idle at its prompt with a "remaining
+   work" list (abandonment), will not settle by waiting — go straight to the watchdog below.
+   Repeated empty responses and tool-call XML printed as text are the same class of failure.
 3. **On each `worker_done`**, settle it before acknowledging the Delivery:
    - `succeeded` → **check how it was verified before you merge.** Read `## Merge gate` in
      `docs/agents/setup.md` and confirm the report matches it: under `ci: github-actions` the PR
      must show at least one check and all green (`gh pr checks <pr>` — `no checks reported` is a
-     failed gate, not a pass); under `ci: local <command>` the `worker_done` body must quote that
-     command's result; under `ci: unverified` there is nothing to check and the merge is the
-     user's accepted risk. A `succeeded` that does not name its evidence is not a pass — ask the
-     worker (`orca orchestration reply`) or gate it, do not merge on trust.
+     failed gate, not a pass) **and be mergeable** (`gh pr view <pr> --json mergeable,mergeStateStatus`
+     — `CONFLICTING` is a failed gate: send it back for a rebase before merging); under
+     `ci: local <command>` the `worker_done` body must quote that command's result; under
+     `ci: unverified` there is nothing to check and the merge is the user's accepted risk.
+     A `succeeded` that does not name its evidence is not a pass — ask the worker
+     (`orca orchestration reply`) or gate it, do not merge on trust.
      Once the gate holds, **merge** the task branch, then clean up, then re-sweep. Release then
      close is the nominal path for every `terminal create` worker (opencode, claude-code, grok):
      `worker-release` returns `retained / external_terminal`, then
@@ -172,7 +184,9 @@ creates gates deadlocks the DAG by construction.
 
 ## Watchdog: worker finished but no worker_done
 
-A worker can finish its work and idle at the prompt without sending `worker_done`. When a wait
+A worker can finish its work and idle at the prompt without sending `worker_done`. It can also
+end its turn early — task visibly incomplete (~80 % done), a tidy "remaining work" list at the
+prompt — which settles nothing. Both enter through this door; only step 2 differs. When a wait
 window times out, inspect each unsettled dispatch instead of waiting blindly:
 
 1. `orca orchestration worker-read --dispatch <id> --json` and
@@ -188,6 +202,10 @@ window times out, inspect each unsettled dispatch instead of waiting blindly:
    orca terminal send --terminal <handle> --text 'orca orchestration send --type worker_done --subject "<status>" --body "<done, found, left>" --task-id <task_id> --dispatch-id <dispatch_id> --outcome succeeded --files-modified "path/a" --json' --enter --json
    ```
    then continue `check --wait`.
+   If instead it abandoned early (idle prompt, incomplete work, a "left to do" list), do **not**
+   finalize as succeeded: cut the remainder into a follow-up task whose spec names what the
+   existing branch already holds, and settle this dispatch honestly (`--outcome failed`, body =
+   what is done vs. left) before dispatching the follow-up.
 3. If it still does not settle, recover manually:
    `orca orchestration task-update --id <task_id> --status completed` then
    `orca orchestration worker-release --dispatch <dispatch_id> --json`.
@@ -245,6 +263,12 @@ terminals are still alive.
 - The coordinator merges, the worker never does. The merge is what unblocks dependents, so
   merge promptly after a `succeeded` report — a dependent blocked on an unmerged parent looks
   identical to a stuck run.
+- **But never mid-rebase.** Merging while another worker is rebasing onto the old tip or has CI
+  pending on it moves `main` under that worker — its next push re-conflicts and it burns its
+  budget fighting markers (measured: two `main` moves during one rebase, 6 minutes lost).
+  Batch merges at settle points, back-to-back between wait windows. After any merge, workers
+  rebasing must target the new tip: `git fetch origin && git rebase origin/<default>` — never
+  a stale local `<default>`.
 
 ## Hard-won notes
 
