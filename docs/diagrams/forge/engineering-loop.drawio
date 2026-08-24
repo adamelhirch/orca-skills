@@ -1,0 +1,27 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="forgeloop" name="Engineering loop">
+    <mxGraphModel dx="800" dy="500" grid="0" page="1" pageScale="1" pageWidth="1720" pageHeight="640">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="t" value="THE FORGE ENGINEERING LOOP" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=26;fontStyle=1;fontColor=#2D2926;" vertex="1" parent="1"><mxGeometry x="40" y="28" width="700" height="36" as="geometry"/></mxCell>
+        <mxCell id="st" value="five skills orbit everything you ship — each lap is cheaper" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=13;fontColor=#666666;" vertex="1" parent="1"><mxGeometry x="40" y="66" width="700" height="22" as="geometry"/></mxCell>
+        <mxCell id="tag" value="FORGE-SUITE · LOOP-B" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=top;fontSize=10;fontColor=#999999;" vertex="1" parent="1"><mxGeometry x="1480" y="32" width="200" height="18" as="geometry"/></mxCell>
+        <mxCell id="hub" value="&lt;b&gt;SHIPPED WORK&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px&quot; color=&quot;#FFDDDD&quot;&gt;evidence-based · gate-intact&lt;/font&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#E91E63;strokeColor=#2D2926;fontColor=#FFFFFF;fontSize=16;" vertex="1" parent="1"><mxGeometry x="750" y="255" width="220" height="150" as="geometry"/></mxCell>
+        <mxCell id="ring" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#BBBBBB;dashed=1;" vertex="1" parent="1"><mxGeometry x="700" y="205" width="320" height="250" as="geometry"/></mxCell>
+        <mxCell id="s1" value="&lt;b&gt;SPRINT&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px&quot; color=&quot;#555555&quot;&gt;cut stories · readiness gate&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#B8D8BE;strokeColor=#2D2926;fontColor=#2D2926;fontSize=14;" vertex="1" parent="1"><mxGeometry x="765" y="50" width="190" height="70" as="geometry"/></mxCell>
+        <mxCell id="s2" value="&lt;b&gt;WORKERS RUN&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px&quot; color=&quot;#555555&quot;&gt;dsh fleet · cents per task&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#B8D8BE;strokeColor=#2D2926;fontColor=#2D2926;fontSize=14;" vertex="1" parent="1"><mxGeometry x="1007" y="226" width="190" height="70" as="geometry"/></mxCell>
+        <mxCell id="s3" value="&lt;b&gt;REVIEW&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px&quot; color=&quot;#555555&quot;&gt;lenses gate merges&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#B8D8BE;strokeColor=#2D2926;fontColor=#2D2926;fontSize=14;" vertex="1" parent="1"><mxGeometry x="915" y="511" width="190" height="70" as="geometry"/></mxCell>
+        <mxCell id="s4" value="&lt;b&gt;E2E TESTS&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px&quot; color=&quot;#555555&quot;&gt;money paths green&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#B8D8BE;strokeColor=#2D2926;fontColor=#2D2926;fontSize=14;" vertex="1" parent="1"><mxGeometry x="615" y="511" width="190" height="70" as="geometry"/></mxCell>
+        <mxCell id="s5" value="&lt;b&gt;RETRO&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px&quot; color=&quot;#555555&quot;&gt;verified findings · max 3 changes&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#B8D8BE;strokeColor=#2D2926;fontColor=#2D2926;fontSize=14;" vertex="1" parent="1"><mxGeometry x="523" y="226" width="190" height="70" as="geometry"/></mxCell>
+        <mxCell id="cc" value="COURSE CORRECT" style="rhombus;whiteSpace=wrap;html=1;fillColor=#E91E63;strokeColor=#2D2926;fontColor=#FFFFFF;fontSize=11;" vertex="1" parent="1"><mxGeometry x="664" y="143" width="150" height="54" as="geometry"/></mxCell>
+        <mxCell id="l1" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#2D2926;strokeWidth=2;endArrow=blockThin;exitX=1;exitY=0.5;entryX=0.5;entryY=0;" edge="1" parent="1" source="s1" target="s2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l2" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#2D2926;strokeWidth=2;endArrow=blockThin;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="s2" target="s3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l3" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#2D2926;strokeWidth=2;endArrow=blockThin;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1" source="s3" target="s4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l4" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#2D2926;strokeWidth=2;endArrow=blockThin;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" edge="1" parent="1" source="s4" target="s5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l5" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#E91E63;strokeWidth=3;endArrow=blockThin;exitX=0;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="s5" target="cc"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="l6" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#E91E63;strokeWidth=3;endArrow=blockThin;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="cc" target="s1"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

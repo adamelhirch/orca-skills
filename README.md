@@ -84,6 +84,21 @@ reviews, retrospectives, and execution planning. They interlock with the Orca pi
 
 **Evidence path:** `/forge-research` · `/forge-architecture` · `/forge-context`.
 
+### The four use-case maps
+
+Drawn as native `.drawio` diagrams (editable sources in
+[`docs/diagrams/forge/`](docs/diagrams/forge/)) — one per use case:
+
+| Use case | Diagram |
+| --- | --- |
+| Ship a product from idea to executed SaaS | ![The Forge product path](docs/diagrams/forge/product-path.png) |
+| The engineering loop around everything shipped | ![The Forge engineering loop](docs/diagrams/forge/engineering-loop.png) |
+| Evidence instruments behind every decision | ![The Forge evidence hub](docs/diagrams/forge/evidence-hub.png) |
+| The whole family at a glance | ![The Forge family map](docs/diagrams/forge/family-map.png) |
+
+Regenerate the PNGs after editing a source: `drawio -x -f png --width 2000 -o <name>.png <name>.drawio`
+(draw.io desktop CLI ≥ 30).
+
 | Skill | Purpose |
 | --- | --- |
 | `/forge-idea` | Pressure-test an idea through relentless questioning until it hardens into a decision or dies cheaply. Three verdicts: hardened, proved out, died cheap. |

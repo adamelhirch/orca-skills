@@ -1,0 +1,34 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="forgechain" name="Product path">
+    <mxGraphModel dx="800" dy="400" grid="0" page="1" pageScale="1" pageWidth="1720" pageHeight="420">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="t" value="THE FORGE PRODUCT PATH" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=26;fontStyle=1;fontColor=#2D2926;" vertex="1" parent="1"><mxGeometry x="40" y="28" width="700" height="36" as="geometry"/></mxCell>
+        <mxCell id="st" value="from shower thought to worker-executed SaaS — every gate kills risk cheaply" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=13;fontColor=#666666;" vertex="1" parent="1"><mxGeometry x="40" y="66" width="800" height="22" as="geometry"/></mxCell>
+        <mxCell id="tag" value="FORGE-SUITE · PATH-A" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=top;fontSize=10;fontColor=#999999;" vertex="1" parent="1"><mxGeometry x="1480" y="32" width="200" height="18" as="geometry"/></mxCell>
+
+        <mxCell id="idea" value="&lt;b&gt;IDEA&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px&quot; color=&quot;#555555&quot;&gt;a shower thought&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9E6;strokeColor=#2D2926;fontColor=#2D2926;fontSize=13;" vertex="1" parent="1"><mxGeometry x="60" y="180" width="150" height="70" as="geometry"/></mxCell>
+        <mxCell id="p1" value="&lt;b&gt;/forge-idea&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px&quot; color=&quot;#555555&quot;&gt;pressure-test or die cheap&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#B8D8BE;strokeColor=#2D2926;fontColor=#2D2926;fontSize=13;" vertex="1" parent="1"><mxGeometry x="268" y="180" width="160" height="70" as="geometry"/></mxCell>
+        <mxCell id="g1" value="vague claims die here" style="rhombus;whiteSpace=wrap;html=1;fillColor=#E91E63;strokeColor=#2D2926;fontColor=#FFFFFF;fontSize=10;" vertex="1" parent="1"><mxGeometry x="452" y="188" width="120" height="54" as="geometry"/></mxCell>
+        <mxCell id="p2" value="&lt;b&gt;/forge-prfaq&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px&quot; color=&quot;#555555&quot;&gt;press release before any build&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#B8D8BE;strokeColor=#2D2926;fontColor=#2D2926;fontSize=13;" vertex="1" parent="1"><mxGeometry x="596" y="180" width="160" height="70" as="geometry"/></mxCell>
+        <mxCell id="p3" value="&lt;b&gt;/forge-brief&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px&quot; color=&quot;#555555&quot;&gt;7 fields · scope fence&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#B8D8BE;strokeColor=#2D2926;fontColor=#2D2926;fontSize=13;" vertex="1" parent="1"><mxGeometry x="780" y="180" width="140" height="70" as="geometry"/></mxCell>
+        <mxCell id="p4" value="&lt;b&gt;/forge-prd&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px&quot; color=&quot;#555555&quot;&gt;testable FRs · traceability&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#B8D8BE;strokeColor=#2D2926;fontColor=#2D2926;fontSize=13;" vertex="1" parent="1"><mxGeometry x="944" y="180" width="150" height="70" as="geometry"/></mxCell>
+        <mxCell id="p5" value="&lt;b&gt;/forge-ux&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px&quot; color=&quot;#555555&quot;&gt;journeys · states · microcopy&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#B8D8BE;strokeColor=#2D2926;fontColor=#2D2926;fontSize=13;" vertex="1" parent="1"><mxGeometry x="1118" y="180" width="150" height="70" as="geometry"/></mxCell>
+        <mxCell id="g2" value="scope drift dies here" style="rhombus;whiteSpace=wrap;html=1;fillColor=#E91E63;strokeColor=#2D2926;fontColor=#FFFFFF;fontSize=10;" vertex="1" parent="1"><mxGeometry x="1292" y="188" width="120" height="54" as="geometry"/></mxCell>
+        <mxCell id="p6" value="&lt;b&gt;/forge-spec&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:10px&quot; color=&quot;#555555&quot;&gt;SPEC kernel = machine contract&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#B8D8BE;strokeColor=#2D2926;fontColor=#2D2926;fontSize=13;" vertex="1" parent="1"><mxGeometry x="1436" y="180" width="150" height="70" as="geometry"/></mxCell>
+        <mxCell id="dest" value="&lt;b&gt;/orca-plan → WORKERS SHIP IT&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF200;strokeColor=#2D2926;fontColor=#2D2926;fontSize=14;dashed=0;" vertex="1" parent="1"><mxGeometry x="1436" y="300" width="220" height="56" as="geometry"/></mxCell>
+
+        <mxCell id="e0" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#2D2926;strokeWidth=2;endArrow=blockThin;" edge="1" parent="1" source="idea" target="p1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#2D2926;strokeWidth=2;endArrow=blockThin;" edge="1" parent="1" source="p1" target="g1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#2D2926;strokeWidth=2;endArrow=blockThin;" edge="1" parent="1" source="g1" target="p2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#2D2926;strokeWidth=2;endArrow=blockThin;" edge="1" parent="1" source="p2" target="p3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#2D2926;strokeWidth=2;endArrow=blockThin;" edge="1" parent="1" source="p3" target="p4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#2D2926;strokeWidth=2;endArrow=blockThin;" edge="1" parent="1" source="p4" target="p5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#2D2926;strokeWidth=2;endArrow=blockThin;" edge="1" parent="1" source="p5" target="g2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#2D2926;strokeWidth=2;endArrow=blockThin;" edge="1" parent="1" source="g2" target="p6"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e8" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#E91E63;strokeWidth=3;endArrow=blockThin;exitX=1;exitY=0.5;entryX=0.5;entryY=0;" edge="1" parent="1" source="p6" target="dest"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
