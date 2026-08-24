@@ -14,6 +14,26 @@
         "orca-resume",
         "orca-freebuff"
       ]
+    },
+    {
+      "title": "Forge — product & engineering lifecycle",
+      "description": "Multi-use skills distilled from the BMad Method: pressure-test ideas, work backwards through PRFAQs, briefs, PRDs, specs, architecture, UX, research, reviews, retrospectives, course corrections, sprint planning, e2e tests, and agent-context authoring. Standalone — no BMad install required.",
+      "skills": [
+        "forge-idea",
+        "forge-prfaq",
+        "forge-brief",
+        "forge-prd",
+        "forge-spec",
+        "forge-architecture",
+        "forge-ux",
+        "forge-research",
+        "forge-review",
+        "forge-retrospective",
+        "forge-correct-course",
+        "forge-sprint",
+        "forge-e2e-tests",
+        "forge-context"
+      ]
     }
   ]
 }

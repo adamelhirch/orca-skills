@@ -68,6 +68,39 @@ pipeline above is the current overview until the diagram is regenerated.
 | `/orca-resume` | Resume an Orca project: setup gate, load handoff + plan, reconcile with live Orca state, flag drift, re-anchor. |
 | `/orca-freebuff` | Run the `freebuff` worker runtime: free (ad-funded) coding agents driven as terminal TUIs. No headless mode exists, so the orchestrator injects the prompt, polls for a completion marker, verifies the work itself, and impersonates `worker_done` from the cockpit. |
 
+## Forge family — product & engineering lifecycle
+
+Distilled from the BMad Method into standalone skills (no BMad install needed): take anything
+from a shower thought to a validated SaaS, through ideation gates, product docs, research,
+reviews, retrospectives, and execution planning. They interlock with the Orca pipeline —
+`/forge-spec` output is `/orca-plan`'s ideal input; `/forge-review` lenses gate merges;
+`/forge-retrospective` findings patch the contracts back.
+
+**Product path:** `/forge-idea` → `/forge-prfaq` → `/forge-brief` → `/forge-prd` →
+(`/forge-ux`) → `/forge-spec` → `/orca-plan` → execution.
+
+**Engineering path:** `/forge-review` · `/forge-e2e-tests` · `/forge-retrospective` ·
+`/forge-correct-course` · `/forge-sprint`.
+
+**Evidence path:** `/forge-research` · `/forge-architecture` · `/forge-context`.
+
+| Skill | Purpose |
+| --- | --- |
+| `/forge-idea` | Pressure-test an idea through relentless questioning until it hardens into a decision or dies cheaply. Three verdicts: hardened, proved out, died cheap. |
+| `/forge-prfaq` | Working Backwards challenge: press release + customer FAQ + internal FAQ drafted then attacked; outputs a five-field distillate for downstream consumption. |
+| `/forge-brief` | Create/update/validate the seven-field product brief: vision, users + anti-users, problem, solution, differentiation, success signal, scope fence. |
+| `/forge-prd` | Create/update/validate the PRD: stories → numbered testable FRs → NFRs → out-of-scope fence, with traceability and worker-fit passes. |
+| `/forge-spec` | Distill any input into the SPEC kernel (Why, Capabilities, Constraints, Non-goals, Success signal) — the machine contract /orca-plan consumes. Same slug updates in place. |
+| `/forge-architecture` | The lean spine: checkable invariants, boundaries, ADR one-liners with rejected alternatives, data shapes two workers can implement against independently. |
+| `/forge-ux` | Journeys with failure paths, screen inventory, states matrix (empty/loading/error/success), real microcopy, acceptance-criteria hooks per step. |
+| `/forge-research` | Decision-grade recon: draft prompts for external deep research, run cited web fan-out, or process reports. Claims carry sources; conclusions never come from training data alone. |
+| `/forge-review` | Multi-lens adversarial review of diffs/docs/specs — edge cases, verification gaps, security, clarity — with triage that maps to merge gates. |
+| `/forge-retrospective` | Evidence-based retro over finished work: verified findings vs sources, failure taxonomy, at most 3 process changes with owners. |
+| `/forge-correct-course` | Mid-run change management: amend / structured pivot / abort, with traceability to triggers, affected tasks, and user sign-off on load-bearing flips. |
+| `/forge-sprint` | Readiness gate → cut epics/stories (S/M/L, shared files flagged) → read-only status sweeps; stories map 1:1 onto /orca-plan task blocks. |
+| `/forge-e2e-tests` | Journey-driven end-to-end tests on the money paths only: harness detection, selector discipline (data-testid), run-until-green, coverage doc. |
+| `/forge-context` | Author/refresh/audit AGENTS.md so any agent works here from minute one: verified commands, conventions actually in force, the verification contract. |
+
 ## Prerequisites
 
 - The Orca runtime running (`orca status`), with the `orca-cli` and `orchestration` skills
