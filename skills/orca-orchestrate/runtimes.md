@@ -75,8 +75,36 @@ candidate shapes, to be settled by the first real run:
    (`dispatch --return-preamble --dry-run --json`), appends it to the task spec, launches
    `dsh --profile headless "<spec + preamble>"`, then registers the dispatch so Orca tracks it.
 
-Until one shape is proven, treat `dsh` as **pilot-only**: single canary task, coordinator
-present, never on a critical path unattended.
+The pilot run (2026-08-24, repo `dsh-pilot`, 2 parallel mechanical tasks) settled the open
+questions:
+
+- **Proven shape: mail-poll wrapper + coordinator-sent preamble.** `worker-start` refuses a
+  non-agent terminal (`agent_unconfigured`), but the freebuff path works:
+  `terminal create --command ./dsh-worker.sh` (a script that polls
+  `orca orchestration check --unread` for its dispatch), then
+  `dispatch --task <id> --to <handle>` **without** `--inject` — Orca records the dispatch
+  (`agent_unconfigured` is only enforced on `worker-start`). The preamble itself is delivered by
+  the coordinator with `orchestration send --type dispatch --to <handle> --body "<ids + spec +
+  worker_done command>"`; the wrapper feeds it to `dsh --profile headless`. The worker then
+  sends its own native `worker_done` (verified end-to-end, both workers).
+- **Sandbox vs linked worktrees is the one real blocker.** The writable root of a session is
+  its launch directory, immutable per session (`writableRoots`: workspace root + platform temp
+  areas); `$DSH_HOME/cordis.patch.yml` can patch `sandbox-policy.workspaceRoot` but that field
+  only backs *sessionless* calls. An Orca task worktree's git metadata lives in the primary
+  worktree's `.git/worktrees/<name>/`, outside any session root — so `git add/commit` fails
+  with `Operation not permitted`, and headless escalation to `danger-full-access` fails closed
+  (`approval: ask`, no channel). Both pilot workers reported exactly this and honestly marked
+  themselves `failed`. **v1 contract: the dsh worker produces and tests; the coordinator
+  commits.** A wrapper-side `git add/commit` after `dsh` exits (outside the sandboxed process)
+  is the v2 candidate if worker-side commits become necessary.
+- **Retry mechanics:** an honest `failed` `worker_done` auto-marks the task failed;
+  re-dispatch requires `task-update --status ready` first. `check` takes `--terminal`, not
+  `--from`; `task-list` takes `--from`.
+- Pilot outcome: 13/13 assertions green across both tasks, two evidenced `worker_done`s, zero
+  degenerate output from flash-0731 under its native harness.
+
+Until a second pilot proves worker-side commits or a wider policy, treat `dsh` as
+**pilot-proven for produce+test+report**, coordinator commits included in the settle step.
 
 `freebuff` also carries two hard limits the others do not, both verified on this toolchain:
 
