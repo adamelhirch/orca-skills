@@ -16,13 +16,67 @@ you want to work in, and the runtime for the cost and capability the tasks need.
 | `claude-code` | Claude subscription/API | `~/.claude/agents/worker.md` | itself | tasks wanting Claude Code's tooling |
 | `grok` | xAI account | `~/.grok/agents/worker.md` | itself | another supervised agent runtime; `-p` / `--prompt-file` is real headless, not this TUI path |
 | `hermes` | your Hermes provider key (e.g. ox-alpha via opencode-go) | profile `orca-worker` / skill in `~/.hermes/skills/` | itself | another supervised agent runtime; persistent memory/skills ecosystem |
+| `dsh` | DeepInfra key (~$0.08/M in, $0.016 cached, $0.18/M out on V4-Flash-0731) | none — headless one-shot process, no TUI | itself (native `worker_done`, verified component-level) | cheap mechanical tasks at volume; the token-economy runtime |
 | `freebuff` | free (ad-funded) | none — no agent in the terminal | **coordinator, impersonated** | throwaway tasks where free matters — **one at a time** |
 
 `opencode`, `claude-code`, `grok`, and `hermes` are *supervised agent* runtimes: they run the
 permissive `worker` profile installed by `/orca-setup`, follow the shared contract, and send their
 own `worker_done`.
-`freebuff` is a *driven TUI* runtime: there is no agent, the coordinator types into it and signs
-the result. That difference is the whole reason to prefer the first two by default.
+`dsh` is a *headless process* runtime: no TUI, no agent directory — each dispatch launches one
+one-shot `dsh --profile headless "<task>"` that reads the injected task, works, sends its own
+`worker_done`, and exits (exit 0 = completed). It follows the shared contract because the
+contract is part of the prompt it receives. `freebuff` is a *driven TUI* runtime: there is no
+agent, the coordinator types into it and signs the result.
+
+`dsh` specifics, all verified at component level on this toolchain (2026-08-24, dsh
+`0.1.1-rc.2`, DeepInfra `DeepSeek-V4-Flash-0731`; **not yet exercised end-to-end in an Orca run**):
+
+- **Model config lives in `$DSH_HOME/settings.yaml`** (`~/.dsh/`), not in flags: a custom
+  provider under `llm-pi-ai.providers.<id>` (`api: openai-completions`,
+  `baseURL: https://api.deepinfra.com/v1/openai`, `apiKeyEnv: DEEPINFRA_API_KEY`) with
+  `compat: {supportsDeveloperRole: false, maxTokensField: max_tokens, thinkingFormat: deepseek}`
+  — without those switches DeepInfra refuses reasoning-model requests — plus models
+  `deepseek-ai/DeepSeek-V4-Flash-0731` / `-Flash` with `reasoning: true`. Key goes in
+  `~/.dsh/.env` (`DEEPINFRA_API_KEY=...`). Default model row:
+  `agent-default-model: {provider: deepinfra, model: deepseek-ai/DeepSeek-V4-Flash-0731}`.
+  The home-level settings apply to every profile; there is nothing per-worktree to install.
+- **No trust/approval gate exists** (nothing to cover with a flag), and the shipped permission
+  preset is `workspace-write`: bash + filesystem mutations are confined to the session workspace
+  and platform temp roots by the harness itself (Seatbelt sandbox on macOS) — reads/network stay
+  open. The shared contract's Sandbox-discipline section still applies on top.
+- **No TUI to watch**: availability is process exit, not screen markers. There is no
+  `tui-idle` trap because there is no TUI. A long dispatch shows as a live process running
+  `dsh` inside its terminal.
+- **The worker can execute the Orca CLI itself** (verified): a headless `dsh` task ran
+  `orca orchestration check --peek --json` successfully, so a native `worker_done` from the
+  injected preamble is expected to work — confirm on the first end-to-end dispatch before
+  fanning out.
+- **Known gaps of the headless surface**: no mid-task interaction (an unresolved `ask` cannot be
+  answered — the coordinator must treat it as failed-and-follow-up), no heartbeat cadence of its
+  own, and the model remains deepseek-flash: the Model-reliability rules (canary first,
+  degenerate-signature escalation) fully apply.
+
+### `dsh`
+
+```bash
+orca worktree create --name <slug> --no-parent --setup run --json
+orca terminal create --worktree id:<wtId> --title <slug> \
+  --command "dsh --profile headless '<task spec>'" --json   # exact injection path TBD below
+```
+
+The open integration question is how the dispatch preamble reaches the one-shot process:
+`worker-start` binds a *terminal*, and a finished `headless` run has already exited. Two
+candidate shapes, to be settled by the first real run:
+
+1. **Wrapper-script shape** — a tiny wrapper launched via `terminal create` that waits for
+   `dispatch --inject` text on stdin (or polls the Run mailbox), passes it to
+   `dsh --profile headless`, then idles. This keeps the standard bind order intact.
+2. **Coordinator-composed shape** — the coordinator fetches the preamble itself
+   (`dispatch --return-preamble --dry-run --json`), appends it to the task spec, launches
+   `dsh --profile headless "<spec + preamble>"`, then registers the dispatch so Orca tracks it.
+
+Until one shape is proven, treat `dsh` as **pilot-only**: single canary task, coordinator
+present, never on a critical path unattended.
 
 `freebuff` also carries two hard limits the others do not, both verified on this toolchain:
 
