@@ -2,11 +2,12 @@
 name: orca-plan
 description: >-
   Brainstorm an Orca run with the user before any worker runs: grill the objective
-  until the agent and the user share a mental model, then write docs/agents/plan.md
-  and get explicit approval before tasks are cut. Orchestrator sessions only.
-  Invoke with /orca-plan.
+  until the agent and the user share a mental model (standard interview, or deep
+  mode adding structured divergence before and a pre-mortem/red-team pressure
+  pass after), then write docs/agents/plan.md and get explicit approval before
+  tasks are cut. Orchestrator sessions only. Invoke with /orca-plan.
 disable-model-invocation: true
-argument-hint: "What are we planning?"
+argument-hint: "What are we planning? (add 'deep' for the full brainstorm)"
 ---
 
 # Plan an Orca run
@@ -15,6 +16,23 @@ Turn an objective into a shared, approved plan before any task is cut. This is t
 step of the pipeline (`/orca-setup` → `/orca-plan` → `/orca-tasks` → `/orca-orchestrate`). The
 orchestrator interrogates the objective relentlessly until the agent and the user are on the
 same page, then writes a durable plan document the next skills consume.
+
+## Two modes
+
+- **Standard** (default) — the interview below, straight through. Right for small runs, clear
+  objectives, or a user who already knows what they want.
+- **Deep** (`deep: yes` at invocation, or when the objective is novel, ambiguous, expensive to
+  be wrong about, or the user says "brainstorm it properly") — adds two phases around the same
+  interview:
+  1. **Diverge** — before the frontier exists, run 2–4 structured ideation techniques
+     ([references/diverge.md](references/diverge.md)) to surface framings, constraints that
+     matter, and candidate decisions the user would never have named. Output: candidates.
+  2. **Pressure** — before approval, attack the draft plan with 2–3 elicitation methods
+     ([references/pressure.md](references/pressure.md)): pre-mortem, red team, assumption
+     audit. Output: plan edits, marked assumptions, logged accepted risks.
+
+  In deep mode the flow is: Diverge → frontier interview (unchanged) → draft plan → Pressure →
+  final approval. Standard mode skips both phases; everything else in this skill is identical.
 
 ## Gate
 
@@ -111,6 +129,8 @@ Write `docs/agents/plan.md` (rolling, overwrite) with this schema:
 ## Context         (why now, constraints, references by path — CONTEXT.md, docs/adr/, issues)
 ## Decisions       (what was settled, one line each)
 ## Out of scope    (explicitly excluded, so workers don't drift)
+## Deep-mode log   (deep runs only: techniques run + candidates rejected, pressure findings,
+                   assumptions marked in specs, accepted risks with owners — omit if empty)
 
 ## Tasks
 <!-- one block per task, keyed by stable id -->
